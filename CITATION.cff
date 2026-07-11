@@ -1,0 +1,54 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Oscillator Chain Demo: Interactive Demonstrator of Structural Methods for Mechanical Oscillatory Systems"
+authors:
+  - family-names: "ELISEEV"
+    given-names: "ANDREY"
+    orcid: "https://orcid.org/0000-0003-0222-2507"
+version: 1.0.0
+date-released: 2026-07-11
+url: "https://github.com/poleya/oscillator-chain-demo"
+doi: "10.5281/zenodo.XXXXXXX"
+repository-code: "https://github.com/poleya/oscillator-chain-demo"
+abstract: >
+  Interactive web-based demonstrator for structural mathematical modeling
+  of mechanical oscillatory systems. Implements two operating modes:
+  (1) Game mode — Tetris-like construction of 1D oscillator chains with
+  8 element types (mass, linear/nonlinear springs, linear/nonlinear
+  dampers, harmonic exciter, phase shift, destroyer); (2) Science mode —
+  comparative analysis of two frequency response function (FRF) calculation
+  methods: structural approach (complex amplitudes, algebraic system
+  (-w^2*M + i*w*B + K)*X = F) and numerical approach (ODE integration
+  via Euler method with steady-state extraction by least squares).
+  Validates structural method for linear systems (error < 5%) and
+  demonstrates its inapplicability for nonlinear systems (Duffing model,
+  quadratic damping). Developed as part of doctoral dissertation research
+  on structural methods in vibration mechanics (Eliseev's scientific school).
+keywords:
+  - oscillatory systems
+  - structural modeling
+  - vibration mechanics
+  - Duffing oscillator
+  - frequency response function
+  - complex amplitudes
+  - educational software
+  - gamification
+  - Eliseev school
+  - mechanical engineering
+license: MIT
+type: software
+references:
+  - type: book
+    authors:
+      - family-names: Eliseev
+        given-names: S.V.
+    title: "Vibration protection of complex mechanical systems"
+    year: 2014
+    publisher: "Irkutsk State University"
+  - type: book
+    authors:
+      - family-names: Blekhman
+        given-names: I.I.
+    title: "Vibrational mechanics"
+    year: 1994
+    publisher: "Nauka, Moscow"

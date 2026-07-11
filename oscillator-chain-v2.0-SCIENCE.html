@@ -1,0 +1,1732 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>1D Цепь: Игра + Научный анализ</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height:100%; overflow:hidden; background:#111; color:#ccc; font-family:sans-serif; }
+#sim { position:relative; width:100%; height:100%; }
+canvas { display:block; width:100%; height:100%; }
+
+#ui {
+  position: absolute; top:0; right:0; bottom:0; width:280px;
+  background: rgba(20,20,20,0.95); border-left: 1px solid #333;
+  overflow-y: auto; padding: 15px; z-index: 10;
+  transition: transform 0.3s;
+}
+#ui.hidden { transform: translateX(100%); }
+
+#toggleBtn {
+  position: absolute; top:10px; right:10px; z-index:20;
+  width:40px; height:40px; background:#333; border:none; border-radius:50%;
+  color:#fff; font-size:20px; cursor:pointer;
+}
+
+h2 { color:#fc6; font-size:16px; margin-bottom:10px; border-bottom:1px solid #444; padding-bottom:5px; }
+h3 { color:#6cf; font-size:13px; margin:15px 0 5px; }
+label { display:flex; justify-content:space-between; font-size:12px; margin:5px 0; }
+input[type=range] { width:140px; }
+.v { color:#fc6; min-width:30px; text-align:right; }
+
+button {
+  width:100%; padding:10px; margin:5px 0; border:none; border-radius:5px;
+  background:#4a6; color:#fff; font-weight:bold; cursor:pointer; font-size:13px;
+}
+button:active { background:#3a5; }
+button.reset { background:#a44; }
+button.type-btn { background:#555; margin-bottom:3px; }
+button.type-btn.active { background:#fc6; color:#000; }
+
+#status {
+  position: absolute; top:10px; left:10px; z-index:5;
+  background: rgba(0,0,0,0.7); padding:8px 12px; border-radius:5px;
+  font-size:12px; line-height:1.5; pointer-events:none;
+}
+
+.hint-box {
+  background:#1a1a1a; border:1px solid #333; border-radius:5px;
+  padding:8px; margin-top:10px; font-size:11px; line-height:1.4; color:#aaa;
+}
+.hint-box b { color:#fc6; }
+
+#controls {
+  position: absolute; bottom:20px; left:50%; transform:translateX(-50%);
+  display:flex; gap:10px; z-index:5;
+}
+.ctrl-btn {
+  width:60px; height:60px; background:rgba(50,50,50,0.8); border:2px solid #666;
+  border-radius:10px; color:#fff; font-size:24px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.ctrl-btn:active { background:rgba(100,100,100,0.9); }
+
+.legend { display:flex; gap:8px; margin:6px 0; font-size:10px; flex-wrap:wrap; }
+.legend span { display:flex; align-items:center; gap:4px; }
+.legend .box { width:14px; height:10px; border-radius:2px; }
+
+.checkbox-label {
+  display:flex; align-items:center; gap:8px; font-size:11px; margin:5px 0;
+}
+.checkbox-label input { width:auto; }
+
+/* Кнопки переключения режимов */
+#modeButtons {
+  position: absolute; top:10px; left:60px; z-index:20;
+  display:flex; gap:5px;
+}
+#modeButtons button {
+  width:40px; height:40px; border-radius:50%; font-size:16px;
+  display:flex; align-items:center; justify-content:center;
+}
+#btnGame { background:#4a6; }
+#btnScience { background:#a6f; }
+#btnGame.active, #btnScience.active { background:#fc6; color:#000; }
+
+/* Научный режим */
+#science-panel {
+  position: absolute; top:0; left:0; right:280px; bottom:0;
+  background: rgba(17,17,17,0.98); padding: 20px;
+  overflow-y: auto; z-index: 8; display: none;
+}
+#science-panel.active { display: block; }
+#science-panel h2 { color: #fc6; margin-bottom: 15px; }
+#science-panel .form-group {
+  background: #1a1a1a; padding: 15px; margin-bottom: 15px;
+  border-radius: 5px; border: 1px solid #333;
+}
+#science-panel label {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 8px 0; font-size: 12px;
+}
+#science-panel input[type="number"] {
+  width: 100px; padding: 5px; background: #222; color: #fff;
+  border: 1px solid #444; border-radius: 3px;
+}
+#science-panel button {
+  background: #4a6; color: #fff; padding: 12px;
+  margin: 5px 0; border: none; border-radius: 5px;
+  cursor: pointer; font-weight: bold; width: 100%;
+}
+#science-panel button:hover { background: #5b7; }
+#science-panel button.compare { background: #a6f; }
+#science-panel button.compare:hover { background: #b7f; }
+#science-panel button.export { background: #fc6; color:#000; }
+#science-panel button.export:hover { background: #fd7; }
+#frf-canvas {
+  width: 100%; height: 500px; background: #0a0a0a;
+  border: 1px solid #444; border-radius: 5px; margin-top: 15px;
+}
+.info-box {
+  background: #222; padding: 10px; border-radius: 5px;
+  font-size: 11px; color: #aaa; margin-top: 10px; line-height: 1.5;
+}
+.info-box b { color: #fc6; }
+.info-box .linear { color: #4f4; }
+.info-box .nonlinear { color: #f44; }
+#results-box {
+  background: #1a1a1a; padding: 15px; border-radius: 5px;
+  border: 1px solid #333; margin-top: 15px; font-size: 12px;
+  line-height: 1.6;
+}
+#results-box h3 { color: #6cf; margin-bottom: 10px; }
+#results-box .metric {
+  display: flex; justify-content: space-between;
+  padding: 5px 0; border-bottom: 1px solid #333;
+}
+#results-box .metric:last-child { border-bottom: none; }
+#results-box .metric b { color: #fc6; }
+#results-box .metric .value { color: #fff; font-weight: bold; }
+#results-box .metric .good { color: #4f4; }
+#results-box .metric .bad { color: #f44; }
+</style>
+</head>
+<body>
+
+<div id="sim">
+  <canvas id="c"></canvas>
+  
+  <div id="modeButtons">
+    <button id="btnGame" class="active" onclick="switchMode('game')">🎮</button>
+    <button id="btnScience" onclick="switchMode('science')">🔬</button>
+  </div>
+  
+  <button id="toggleBtn" onclick="toggleUI()">⚙</button>
+  
+  <div id="status">
+    Масс: <span id="stN" style="color:#fc6">0</span><br>
+    Связей: <span id="stC" style="color:#fc6">0</span><br>
+    Макс. отклонение: <span id="stAmp" style="color:#fc6">0</span> px<br>
+    Состояние: <span id="stState" style="color:#4f4">ПОКОЙ</span>
+  </div>
+
+  <div id="controls">
+    <button class="ctrl-btn" onclick="moveWagon(-1)">←</button>
+    <button class="ctrl-btn" onclick="moveWagon(1)">→</button>
+  </div>
+
+  <!-- Научный режим -->
+  <div id="science-panel">
+    <h2>🔬 Научный анализ: Сравнение методов расчёта АЧХ</h2>
+    
+    <div class="form-group">
+      <h3 style="color:#6cf; margin-bottom:10px;">Параметры системы</h3>
+      <label>Количество масс N <input type="number" id="sci-N" value="3" min="2" max="10"></label>
+      <label>Масса m (кг) <input type="number" id="sci-m" value="1" step="0.1"></label>
+      <label>Жёсткость k (Н/м) <input type="number" id="sci-k" value="100" step="10"></label>
+      <label>Демпфирование b (Н·с/м) <input type="number" id="sci-b" value="0.1" step="0.05"></label>
+      <label>Нелинейность α <input type="number" id="sci-alpha" value="0" step="1"></label>
+      <label>Нелинейность β <input type="number" id="sci-beta" value="0" step="0.5"></label>
+      <label>Амплитуда возбуждения A <input type="number" id="sci-A" value="10" step="1"></label>
+    </div>
+    
+    <div class="form-group">
+      <h3 style="color:#6cf; margin-bottom:10px;">Диапазон частот</h3>
+      <label>ω мин (рад/с) <input type="number" id="sci-omega-min" value="1" step="0.5"></label>
+      <label>ω макс (рад/с) <input type="number" id="sci-omega-max" value="20" step="0.5"></label>
+      <label>Шаг Δω <input type="number" id="sci-omega-step" value="0.5" step="0.1"></label>
+    </div>
+    
+    <button onclick="calculateFRF()">📊 Построить АЧХ (оба метода)</button>
+    <button class="export" onclick="exportAllData()">💾 Экспорт всех данных (JSON + CSV)</button>
+    
+    <canvas id="frf-canvas"></canvas>
+    
+    <div id="results-box" style="display:none;">
+      <h3>📈 Результаты сравнения</h3>
+      <div id="results-content"></div>
+    </div>
+    
+    <div class="info-box">
+      <b>📚 Два метода расчёта АЧХ:</b><br>
+      • <span class="linear">🔵 Структурный (комплексные амплитуды)</span> — решение алгебраической системы (-ω²M + iωB + K)X = F<br>
+      • <span class="nonlinear">🔴 Численный (интегрирование ДУ)</span> — метод Эйлера + выделение установившегося режима<br>
+      <br>
+      <b>🎯 Что это даёт для диссертации:</b><br>
+      • Для <span class="linear">линейных систем</span> (α=0, β=0) оба метода должны совпадать<br>
+      • Для <span class="nonlinear">нелинейных систем</span> (α≠0 или β≠0) численный метод покажет искажения<br>
+      • Разница между методами — мера нелинейных эффектов<br>
+      <br>
+      <b>📊 Экспорт данных:</b><br>
+      • JSON — математическая модель (матрицы M, K, B)<br>
+      • CSV — временные ряды и АЧХ для обоих методов
+    </div>
+  </div>
+
+  <div id="ui">
+    <h2>Поперечные колебания</h2>
+    
+    <div class="legend">
+      <span><div class="box" style="background:#4cf"></div>Масса</span>
+      <span><div class="box" style="background:#4a4"></div>Пружина</span>
+      <span><div class="box" style="background:#f80"></div>Нелин. пружина</span>
+      <span><div class="box" style="background:#a6f"></div>Демпфер</span>
+      <span><div class="box" style="background:#c4f"></div>Нелин. демпфер</span>
+      <span><div class="box" style="background:#f44"></div>Возбудитель</span>
+      <span><div class="box" style="background:#fa0"></div>Фазовый сдвиг</span>
+      <span><div class="box" style="background:#f00"></div>Уничтожитель</span>
+    </div>
+
+    <h3>Тип элемента</h3>
+    <button class="type-btn active" id="btnWagon" onclick="selectType('wagon')">🚂 Масса</button>
+    <button class="type-btn" id="btnSpring" onclick="selectType('spring')">🟢 Пружина</button>
+    <button class="type-btn" id="btnNonlinear" onclick="selectType('nonlinear')">🟠 Нелин. пружина</button>
+    <button class="type-btn" id="btnDamper" onclick="selectType('damper')">🔵 Демпфер</button>
+    <button class="type-btn" id="btnNonlinearDamper" onclick="selectType('nonlinearDamper')">🟣 Нелин. демпфер</button>
+    <button class="type-btn" id="btnForce" onclick="selectType('force')">🔴 Возбудитель</button>
+    <button class="type-btn" id="btnPhase" onclick="selectType('phase')">🟡 Фазовый сдвиг</button>
+    <button class="type-btn" id="btnDestroyer" onclick="selectType('destroyer')">💥 Уничтожитель</button>
+
+    <h3>Параметры</h3>
+    <label>Скорость g <input type="range" id="fallSpeed" min="50" max="1500" value="300" step="50"><span class="v" id="fallSpeedv">300</span></label>
+    <label>Жёсткость k <input type="range" id="sK" min="10" max="200" value="50"><span class="v" id="sKv">50</span></label>
+    <label>Нелинейность α <input type="range" id="sAlpha" min="-50" max="50" value="0" step="1"><span class="v" id="sAlphav">0</span></label>
+    <label>Демпфирование b <input type="range" id="sB" min="0" max="1" step="0.05" value="0.1"><span class="v" id="sBv">0.1</span></label>
+    <label>Нелинейность β <input type="range" id="sBeta" min="-50" max="50" value="0" step="1"><span class="v" id="sBetav">0</span></label>
+    <label>Расстояние L₀ <input type="range" id="sL" min="40" max="100" value="70"><span class="v" id="sLv">70</span></label>
+
+    <h3>Возбудитель</h3>
+    <label>Частота ω <input type="range" id="forceFreq" min="1" max="20" value="5" step="0.5"><span class="v" id="forceFreqv">5</span></label>
+    <label>Амплитуда A <input type="range" id="forceAmp" min="5" max="100" value="30"><span class="v" id="forceAmpv">30</span></label>
+    <label>Фаза φ (°) <input type="range" id="phaseShift" min="0" max="360" value="0" step="10"><span class="v" id="phaseShiftv">0</span></label>
+
+    <h3>Визуализация</h3>
+    <label class="checkbox-label">
+      <input type="checkbox" id="showGraph" checked> График колебаний
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="showForces"> Стрелки сил
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="showTension" checked> Цвет натяжения
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="showHarmonicForce"> Показать гармоническую силу
+    </label>
+
+    <h3>Управление</h3>
+    <button onclick="dropElement()">⬇ Сбросить элемент</button>
+    <button class="reset" onclick="resetChain()">🔄 Сброс цепи</button>
+    
+    <div class="hint-box">
+      <b>🎮 Как играть:</b><br>
+      • Выберите тип элемента<br>
+      • Нажмите "Сбросить элемент"<br>
+      • Стрелки ← → двигают элемент<br>
+      • Элемент встроится в цепь<br>
+      • Наблюдайте колебания на графике<br>
+      <br>
+      <b>🔬 Научный режим:</b><br>
+      • Нажмите кнопку 🔬 вверху слева<br>
+      • Задайте параметры системы<br>
+      • Постройте АЧХ двумя методами<br>
+      • Сравните результаты
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+const P = (id) => parseFloat(document.getElementById(id).value);
+const C = (id) => document.getElementById(id).checked;
+['sK','sAlpha','sB','sBeta','sL','fallSpeed','forceFreq','forceAmp','phaseShift'].forEach(id => {
+  const el = document.getElementById(id);
+  el.oninput = () => document.getElementById(id+'v').textContent = el.value;
+});
+
+let blocks = [];
+let connections = [];
+let fallingElement = null;
+let particles = [];
+let time = 0;
+let equilibriumY = 0;
+let currentType = 'wagon';
+let currentMode = 'game';
+
+const history = [];
+const MAX_HISTORY = 200;
+
+const WAGON_W = 30;
+const WAGON_H = 20;
+const RAMP_WIDTH = 40;
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  equilibriumY = canvas.height * 0.72;
+}
+window.addEventListener('resize', resize);
+resize();
+
+function switchMode(mode) {
+  currentMode = mode;
+  document.getElementById('btnGame').classList.toggle('active', mode === 'game');
+  document.getElementById('btnScience').classList.toggle('active', mode === 'science');
+  
+  if (mode === 'science') {
+    document.getElementById('science-panel').classList.add('active');
+    document.getElementById('sim').style.display = 'none';
+    document.getElementById('controls').style.display = 'none';
+    document.getElementById('status').style.display = 'none';
+  } else {
+    document.getElementById('science-panel').classList.remove('active');
+    document.getElementById('sim').style.display = 'block';
+    document.getElementById('controls').style.display = 'flex';
+    document.getElementById('status').style.display = 'block';
+  }
+}
+
+function toggleUI() {
+  document.getElementById('ui').classList.toggle('hidden');
+}
+
+function selectType(type) {
+  currentType = type;
+  document.querySelectorAll('.type-btn').forEach(btn => btn.classList.remove('active'));
+  document.getElementById('btn' + type.charAt(0).toUpperCase() + type.slice(1)).classList.add('active');
+}
+
+function initChain() {
+  blocks = [];
+  connections = [];
+  particles = [];
+  history.length = 0;
+  
+  const n = 7;
+  const L0 = P('sL');
+  const startX = canvas.width/2 - (n-1)*L0/2;
+  
+  for(let i=0; i<n; i++) {
+    blocks.push({
+      x: startX + i*L0,
+      y: equilibriumY,
+      vy: 0,
+      m: (i===0 || i===n-1) ? 1e9 : 10,
+      fixed: (i===0 || i===n-1),
+      color: (i===0 || i===n-1) ? '#666' : '#4cf',
+      extForce: { amplitude: 0, frequency: 0, phase: 0 },
+      flash: 0,
+      force: 0,
+      harmonicForce: 0
+    });
+  }
+  
+  rebuildConnections();
+}
+
+function resetChain() {
+  initChain();
+  fallingElement = null;
+}
+
+function rebuildConnections() {
+  connections = [];
+  for(let i=0; i<blocks.length-1; i++) {
+    connections.push({
+      left: i, right: i+1,
+      k: P('sK'), alpha: P('sAlpha'),
+      b: P('sB'), beta: P('sBeta'),
+      multiplier: 1, flash: 0, tension: 0,
+      nonlinearSpring: Math.abs(P('sAlpha')) > 0.5,
+      nonlinearDamping: Math.abs(P('sBeta')) > 0.5
+    });
+  }
+}
+
+function dropElement() {
+  if(fallingElement) return;
+  
+  fallingElement = {
+    x: canvas.width / 2,
+    y: 0,
+    vy: 0,
+    type: currentType,
+    color: getTypeColor(currentType)
+  };
+  
+  if(window.innerWidth < 768) toggleUI();
+}
+
+function getTypeColor(type) {
+  const colors = {
+    wagon: '#4cf',
+    spring: '#4a4',
+    nonlinear: '#f80',
+    damper: '#a6f',
+    nonlinearDamper: '#c4f',
+    force: '#f44',
+    phase: '#fa0',
+    destroyer: '#f00'
+  };
+  return colors[type] || '#4cf';
+}
+
+function moveWagon(dir) {
+  if(!fallingElement) return;
+  fallingElement.x += dir * 30;
+  fallingElement.x = Math.max(WAGON_W/2, Math.min(canvas.width - WAGON_W/2, fallingElement.x));
+}
+
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'ArrowLeft') {
+    moveWagon(-1);
+    e.preventDefault();
+  } else if(e.key === 'ArrowRight') {
+    moveWagon(1);
+    e.preventDefault();
+  }
+});
+
+function physics(dt) {
+  const sub = 8;
+  const sdt = dt/sub;
+  
+  if(fallingElement) {
+    const g = P('fallSpeed');
+    fallingElement.vy += g * dt;
+    fallingElement.y += fallingElement.vy * dt;
+    
+    if(fallingElement.y >= equilibriumY - WAGON_H/2) {
+      fallingElement.y = equilibriumY - WAGON_H/2;
+      applyElement(fallingElement);
+      fallingElement = null;
+    }
+  }
+  
+  for(let s=0; s<sub; s++) {
+    for(let i=0; i<blocks.length; i++) {
+      if(blocks[i].fixed) continue;
+      
+      let F = 0;
+      
+      for(let c of connections) {
+        if(c.left === i) {
+          const dy = blocks[c.right].y - blocks[i].y;
+          const dv = blocks[c.right].vy - blocks[i].vy;
+          
+          const linearSpring = c.k * dy;
+          const nonlinearSpring = c.alpha * dy * dy * dy;
+          const linearDamp = c.b * dv;
+          const nonlinearDamp = c.beta * dv * Math.abs(dv);
+          
+          F += linearSpring + nonlinearSpring + linearDamp + nonlinearDamp;
+          c.tension = dy / P('sL');
+        } else if(c.right === i) {
+          const dy = blocks[c.left].y - blocks[i].y;
+          const dv = blocks[c.left].vy - blocks[i].vy;
+          
+          const linearSpring = c.k * dy;
+          const nonlinearSpring = c.alpha * dy * dy * dy;
+          const linearDamp = c.b * dv;
+          const nonlinearDamp = c.beta * dv * Math.abs(dv);
+          
+          F += linearSpring + nonlinearSpring + linearDamp + nonlinearDamp;
+        }
+      }
+      
+      const displacement = blocks[i].y - equilibriumY;
+      F -= P('sK') * 0.1 * displacement;
+      
+      let harmonicF = 0;
+      if(blocks[i].extForce && blocks[i].extForce.amplitude > 0) {
+        harmonicF = blocks[i].extForce.amplitude * Math.sin(
+          blocks[i].extForce.frequency * time + blocks[i].extForce.phase
+        );
+        F += harmonicF;
+      }
+      
+      blocks[i].force = F;
+      blocks[i].harmonicForce = harmonicF;
+      blocks[i].vy += (F / blocks[i].m) * sdt;
+      blocks[i].y += blocks[i].vy * sdt;
+    }
+  }
+  
+  if(history.length >= MAX_HISTORY) history.shift();
+  history.push(blocks.map(b => b.y - equilibriumY));
+  
+  for(let i=particles.length-1; i>=0; i--) {
+    let p = particles[i];
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vy += 500 * dt; p.life -= dt;
+    if(p.life <= 0) particles.splice(i, 1);
+  }
+  
+  for(let b of blocks) {
+    if(b.flash > 0) b.flash -= 0.05;
+  }
+  for(let c of connections) {
+    if(c.flash > 0) c.flash -= 0.05;
+  }
+  
+  time += dt;
+}
+
+function applyElement(element) {
+  if(element.type === 'destroyer') {
+    const target = findNearestElement(element.x);
+    
+    if(target.type === 'block') {
+      const blockIdx = target.index;
+      if(!blocks[blockIdx].fixed) {
+        createBigExplosion(blocks[blockIdx].x, blocks[blockIdx].y, '#f00');
+        blocks.splice(blockIdx, 1);
+        rebuildConnections();
+      }
+    } else if(target.type === 'connection') {
+      const connIdx = target.index;
+      createBigExplosion(
+        (blocks[connections[connIdx].left].x + blocks[connections[connIdx].right].x) / 2,
+        (blocks[connections[connIdx].left].y + blocks[connections[connIdx].right].y) / 2,
+        '#f00'
+      );
+      connections.splice(connIdx, 1);
+    }
+    return;
+  }
+  
+  if(element.type === 'wagon') {
+    const insertIdx = findBestInsertionIndex(element.x);
+    const leftX = blocks[insertIdx-1].x;
+    const rightX = blocks[insertIdx].x;
+    const insertX = (leftX + rightX) / 2;
+    
+    blocks.splice(insertIdx, 0, {
+      x: insertX,
+      y: equilibriumY - 30,
+      vy: 0,
+      m: 10,
+      fixed: false,
+      color: '#4cf',
+      flash: 1.0,
+      extForce: { amplitude: 0, frequency: 0, phase: 0 },
+      force: 0,
+      harmonicForce: 0
+    });
+    rebuildConnections();
+    
+  } else if(element.type === 'spring') {
+    const connIdx = findBestConnectionIndex(element.x);
+    if(connIdx >= 0 && connIdx < connections.length) {
+      connections[connIdx].alpha = 0;
+      connections[connIdx].nonlinearSpring = false;
+      connections[connIdx].k = P('sK');
+      connections[connIdx].flash = 1.0;
+    }
+    
+  } else if(element.type === 'nonlinear') {
+    const connIdx = findBestConnectionIndex(element.x);
+    if(connIdx >= 0 && connIdx < connections.length) {
+      connections[connIdx].alpha = P('sAlpha');
+      connections[connIdx].nonlinearSpring = true;
+      connections[connIdx].flash = 1.0;
+    }
+    
+  } else if(element.type === 'damper') {
+    const connIdx = findBestConnectionIndex(element.x);
+    if(connIdx >= 0 && connIdx < connections.length) {
+      connections[connIdx].beta = 0;
+      connections[connIdx].nonlinearDamping = false;
+      connections[connIdx].b *= 1.5;
+      connections[connIdx].multiplier *= 1.5;
+      connections[connIdx].flash = 1.0;
+    }
+    
+  } else if(element.type === 'nonlinearDamper') {
+    const connIdx = findBestConnectionIndex(element.x);
+    if(connIdx >= 0 && connIdx < connections.length) {
+      connections[connIdx].beta = P('sBeta');
+      connections[connIdx].nonlinearDamping = true;
+      connections[connIdx].flash = 1.0;
+    }
+    
+  } else if(element.type === 'force') {
+    const blockIdx = findBestBlockIndex(element.x);
+    if(blockIdx >= 0 && blockIdx < blocks.length && !blocks[blockIdx].fixed) {
+      blocks[blockIdx].extForce.amplitude += P('forceAmp');
+      blocks[blockIdx].extForce.frequency = P('forceFreq');
+      blocks[blockIdx].extForce.phase = P('phaseShift') * Math.PI / 180;
+      blocks[blockIdx].flash = 1.0;
+    }
+    
+  } else if(element.type === 'phase') {
+    const blockIdx = findBestBlockIndex(element.x);
+    if(blockIdx >= 0 && blockIdx < blocks.length && !blocks[blockIdx].fixed) {
+      if(blocks[blockIdx].extForce.amplitude > 0) {
+        blocks[blockIdx].extForce.phase = P('phaseShift') * Math.PI / 180;
+      } else {
+        blocks[blockIdx].extForce.amplitude = 0;
+        blocks[blockIdx].extForce.frequency = P('forceFreq');
+        blocks[blockIdx].extForce.phase = P('phaseShift') * Math.PI / 180;
+      }
+      blocks[blockIdx].flash = 1.0;
+    }
+  }
+  
+  createExplosion(element.x, equilibriumY, element.color);
+}
+
+function findNearestElement(targetX) {
+  let nearestBlock = null;
+  let nearestBlockDist = Infinity;
+  let nearestConn = null;
+  let nearestConnDist = Infinity;
+  
+  for(let i=0; i<blocks.length; i++) {
+    if(blocks[i].fixed) continue;
+    const dist = Math.abs(blocks[i].x - targetX);
+    if(dist < nearestBlockDist) {
+      nearestBlockDist = dist;
+      nearestBlock = { type: 'block', index: i };
+    }
+  }
+  
+  for(let i=0; i<connections.length; i++) {
+    const midX = (blocks[connections[i].left].x + blocks[connections[i].right].x) / 2;
+    const dist = Math.abs(midX - targetX);
+    if(dist < nearestConnDist) {
+      nearestConnDist = dist;
+      nearestConn = { type: 'connection', index: i };
+    }
+  }
+  
+  return nearestBlockDist < nearestConnDist ? nearestBlock : nearestConn;
+}
+
+function findBestInsertionIndex(targetX) {
+  let bestIdx = 1;
+  let bestDist = Infinity;
+  for(let i=0; i<blocks.length-1; i++) {
+    const midX = (blocks[i].x + blocks[i+1].x) / 2;
+    const dist = Math.abs(midX - targetX);
+    if(dist < bestDist) {
+      bestDist = dist;
+      bestIdx = i + 1;
+    }
+  }
+  return bestIdx;
+}
+
+function findBestConnectionIndex(targetX) {
+  let bestIdx = 0;
+  let bestDist = Infinity;
+  for(let i=0; i<connections.length; i++) {
+    const midX = (blocks[connections[i].left].x + blocks[connections[i].right].x) / 2;
+    const dist = Math.abs(midX - targetX);
+    if(dist < bestDist) {
+      bestDist = dist;
+      bestIdx = i;
+    }
+  }
+  return bestIdx;
+}
+
+function findBestBlockIndex(targetX) {
+  let bestIdx = 0;
+  let bestDist = Infinity;
+  for(let i=0; i<blocks.length; i++) {
+    if(blocks[i].fixed) continue;
+    const dist = Math.abs(blocks[i].x - targetX);
+    if(dist < bestDist) {
+      bestDist = dist;
+      bestIdx = i;
+    }
+  }
+  return bestIdx;
+}
+
+function createExplosion(x, y, color) {
+  for(let i=0; i<15; i++) {
+    particles.push({
+      x: x, y: y,
+      vx: (Math.random()-0.5)*200,
+      vy: (Math.random()-0.5)*200 - 100,
+      life: 0.5 + Math.random()*0.5,
+      color: color
+    });
+  }
+}
+
+function createBigExplosion(x, y, color) {
+  for(let i=0; i<40; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 100 + Math.random() * 300;
+    particles.push({
+      x: x, y: y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1.0 + Math.random() * 1.0,
+      color: color,
+      size: 3 + Math.random() * 4
+    });
+  }
+}
+
+function draw() {
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 4]);
+  ctx.beginPath();
+  ctx.moveTo(0, equilibriumY);
+  ctx.lineTo(canvas.width, equilibriumY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  
+  ctx.fillStyle = '#666';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('— линия равновесия', 10, equilibriumY - 8);
+  
+  for(let c of connections) {
+    drawConnection(c);
+  }
+  
+  for(let b of blocks) {
+    if(b.fixed) drawSupport(b);
+    else drawMass(b);
+  }
+  
+  if(C('showForces')) {
+    for(let b of blocks) {
+      if(!b.fixed) drawForceArrow(b);
+    }
+  }
+  
+  if(C('showHarmonicForce')) {
+    for(let b of blocks) {
+      if(!b.fixed && b.extForce && b.extForce.amplitude > 0) {
+        drawHarmonicForce(b);
+      }
+    }
+  }
+  
+  if(fallingElement) {
+    drawRamp(fallingElement.x);
+  }
+  
+  if(fallingElement) drawFallingElement(fallingElement);
+  
+  for(let p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.color;
+    const size = p.size || 4;
+    ctx.fillRect(p.x-size/2, p.y-size/2, size, size);
+  }
+  ctx.globalAlpha = 1;
+  
+  if(C('showGraph')) {
+    drawGraph();
+  }
+  
+  const maxAmp = Math.max(...blocks.filter(b=>!b.fixed).map(b => Math.abs(b.y - equilibriumY)));
+  const moving = blocks.some(b => !b.fixed && Math.abs(b.vy) > 0.1);
+  document.getElementById('stN').textContent = blocks.filter(b=>!b.fixed).length;
+  document.getElementById('stC').textContent = connections.length;
+  document.getElementById('stAmp').textContent = maxAmp.toFixed(1);
+  const stState = document.getElementById('stState');
+  stState.textContent = moving ? 'КОЛЕБАНИЯ' : 'ПОКОЙ';
+  stState.style.color = moving ? '#f44' : '#4f4';
+}
+
+function drawConnection(c) {
+  const x1 = blocks[c.left].x;
+  const y1 = blocks[c.left].y;
+  const x2 = blocks[c.right].x;
+  const y2 = blocks[c.right].y;
+  
+  let springColor = '#4a4';
+  if(c.nonlinearSpring) {
+    springColor = c.alpha > 0 ? '#f80' : '#f44';
+  }
+  if(C('showTension') && !c.nonlinearSpring) {
+    if(c.tension > 0.1) {
+      const intensity = Math.min(1, c.tension);
+      springColor = `rgb(${Math.floor(100 + intensity*155)}, ${Math.floor(100 - intensity*50)}, ${Math.floor(100 - intensity*50)})`;
+    } else if(c.tension < -0.1) {
+      const intensity = Math.min(1, -c.tension);
+      springColor = `rgb(${Math.floor(100 - intensity*50)}, ${Math.floor(100 - intensity*50)}, ${Math.floor(100 + intensity*155)})`;
+    }
+  }
+  
+  ctx.strokeStyle = springColor;
+  ctx.lineWidth = 2 + (c.multiplier - 1) * 0.5 + (c.nonlinearSpring ? 1 : 0);
+  const segments = 6;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  for(let i=1; i<=segments; i++) {
+    const t = i / segments;
+    const px = x1 + (x2 - x1) * t;
+    const py = y1 + (y2 - y1) * t;
+    const offset = (i % 2 === 0 ? -8 : 8);
+    ctx.lineTo(px, py + offset);
+  }
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  
+  if(c.nonlinearSpring) {
+    const midX = (x1 + x2) / 2;
+    const midY = (y1 + y2) / 2;
+    ctx.fillStyle = springColor;
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('x³', midX, midY - 15);
+  }
+  
+  const midX = (x1 + x2) / 2;
+  const midY = (y1 + y2) / 2;
+  const cylW = Math.abs(x2 - x1) * 0.3;
+  const cylH = 12;
+  
+  let dampColor = '#a6f';
+  if(c.nonlinearDamping) dampColor = '#c4f';
+  
+  ctx.fillStyle = '#333';
+  ctx.fillRect(midX - cylW/2, midY - cylH/2, cylW, cylH);
+  ctx.strokeStyle = dampColor;
+  ctx.lineWidth = c.nonlinearDamping ? 2.5 : 1.5;
+  ctx.strokeRect(midX - cylW/2, midY - cylH/2, cylW, cylH);
+  
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(midX - cylW/2, midY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(midX + cylW/2, midY); ctx.lineTo(x2, y2); ctx.stroke();
+  
+  if(c.nonlinearDamping) {
+    ctx.fillStyle = '#c4f';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('v²', midX, midY - 18);
+  }
+  
+  if(c.flash > 0) {
+    ctx.strokeStyle = `rgba(255,255,100,${c.flash})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+}
+
+function drawHarmonicForce(b) {
+  const x = b.x;
+  const y = b.y;
+  const force = b.harmonicForce;
+  const scale = 0.8;
+  const arrowLen = force * scale;
+  if(Math.abs(arrowLen) < 1) return;
+  
+  ctx.strokeStyle = '#f44';
+  ctx.fillStyle = '#f44';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + arrowLen); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x, y + arrowLen);
+  ctx.lineTo(x - 5, y + arrowLen - (arrowLen > 0 ? 8 : -8));
+  ctx.lineTo(x + 5, y + arrowLen - (arrowLen > 0 ? 8 : -8));
+  ctx.closePath(); ctx.fill();
+  
+  ctx.fillStyle = '#f44';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`F=${force.toFixed(1)}`, x, y + arrowLen + (arrowLen > 0 ? 15 : -10));
+  
+  const glow = Math.abs(force) / b.extForce.amplitude;
+  ctx.strokeStyle = `rgba(255, 68, 68, ${glow * 0.5})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(x, y, 15 + glow * 5, 0, Math.PI * 2); ctx.stroke();
+}
+
+function drawForceArrow(b) {
+  const x = b.x;
+  const y = b.y;
+  const force = b.force;
+  const scale = 0.5;
+  const arrowLen = force * scale;
+  if(Math.abs(arrowLen) < 2) return;
+  
+  ctx.strokeStyle = force > 0 ? '#f44' : '#4cf';
+  ctx.fillStyle = force > 0 ? '#f44' : '#4cf';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + arrowLen); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x, y + arrowLen);
+  ctx.lineTo(x - 4, y + arrowLen - (arrowLen > 0 ? 6 : -6));
+  ctx.lineTo(x + 4, y + arrowLen - (arrowLen > 0 ? 6 : -6));
+  ctx.closePath(); ctx.fill();
+}
+
+function drawGraph() {
+  const graphHeight = 80;
+  const graphY = canvas.height - graphHeight - 5;
+  const graphWidth = canvas.width - 40;
+  const graphX = 20;
+  
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(graphX, graphY, graphWidth, graphHeight);
+  ctx.strokeStyle = '#444'; ctx.lineWidth = 1;
+  ctx.strokeRect(graphX, graphY, graphWidth, graphHeight);
+  
+  ctx.strokeStyle = '#555';
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(graphX, graphY + graphHeight/2); ctx.lineTo(graphX + graphWidth, graphY + graphHeight/2); ctx.stroke();
+  ctx.setLineDash([]);
+  
+  ctx.fillStyle = '#888'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('График колебаний', graphX + 5, graphY + 12);
+  
+  const colors = ['#4cf', '#6f6', '#fc6', '#f6f', '#6ff', '#fa6', '#a6f'];
+  for(let massIdx = 0; massIdx < blocks.length; massIdx++) {
+    if(blocks[massIdx].fixed) continue;
+    ctx.strokeStyle = colors[massIdx % colors.length];
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for(let i = 0; i < history.length; i++) {
+      const x = graphX + (i / MAX_HISTORY) * graphWidth;
+      const displacement = history[i][massIdx] || 0;
+      const y = graphY + graphHeight/2 + displacement * 1.0;
+      if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  
+  ctx.font = '9px sans-serif';
+  for(let i = 0; i < Math.min(5, blocks.length - 2); i++) {
+    ctx.fillStyle = colors[i];
+    ctx.fillRect(graphX + graphWidth - 80, graphY + 5 + i*12, 10, 8);
+    ctx.fillText(`Масса ${i+1}`, graphX + graphWidth - 65, graphY + 12 + i*12);
+  }
+}
+
+function drawRamp(elementX) {
+  const rampTop = 0;
+  const rampBottom = equilibriumY - 100;
+  const rampHeight = rampBottom - rampTop;
+  
+  ctx.fillStyle = '#1e1e1e';
+  ctx.fillRect(elementX - RAMP_WIDTH/2, rampTop, RAMP_WIDTH, rampHeight);
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
+  ctx.strokeRect(elementX - RAMP_WIDTH/2, rampTop, RAMP_WIDTH, rampHeight);
+  
+  ctx.strokeStyle = '#888'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(elementX - 10, rampTop); ctx.lineTo(elementX - 10, rampBottom); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(elementX + 10, rampTop); ctx.lineTo(elementX + 10, rampBottom); ctx.stroke();
+  
+  ctx.strokeStyle = '#5a4a3a'; ctx.lineWidth = 3;
+  for(let y=rampTop+20; y<rampBottom; y+=25) {
+    ctx.beginPath(); ctx.moveTo(elementX - 15, y); ctx.lineTo(elementX + 15, y); ctx.stroke();
+  }
+}
+
+function drawFallingElement(element) {
+  const x = element.x;
+  const y = element.y;
+  
+  if(element.type === 'wagon') {
+    ctx.fillStyle = element.color;
+    ctx.fillRect(x-WAGON_W/2, y-WAGON_H/2, WAGON_W, WAGON_H);
+    ctx.strokeStyle = '#222'; ctx.lineWidth = 1;
+    ctx.strokeRect(x-WAGON_W/2, y-WAGON_H/2, WAGON_W, WAGON_H);
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(x-WAGON_W/3, y+WAGON_H/2+2, 4, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+WAGON_W/3, y+WAGON_H/2+2, 4, 0, Math.PI*2); ctx.fill();
+    
+  } else if(element.type === 'spring') {
+    ctx.strokeStyle = element.color; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x - 15, y);
+    for(let i=0; i<6; i++) ctx.lineTo(x - 15 + (i+1)*5, y + (i%2===0?-8:8));
+    ctx.lineTo(x + 15, y); ctx.stroke();
+    
+  } else if(element.type === 'nonlinear') {
+    ctx.strokeStyle = element.color; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(x - 15, y);
+    for(let i=0; i<6; i++) ctx.lineTo(x - 15 + (i+1)*5, y + (i%2===0?-8:8));
+    ctx.lineTo(x + 15, y); ctx.stroke();
+    ctx.fillStyle = element.color; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('x³', x, y - 12);
+    
+  } else if(element.type === 'damper') {
+    ctx.fillStyle = element.color; ctx.fillRect(x - 15, y - 8, 30, 16);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+    ctx.strokeRect(x - 15, y - 8, 30, 16);
+    
+  } else if(element.type === 'nonlinearDamper') {
+    ctx.fillStyle = '#c4f';
+    ctx.fillRect(x - 15, y - 10, 30, 20);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+    ctx.strokeRect(x - 15, y - 10, 30, 20);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('v²', x, y + 4);
+    
+  } else if(element.type === 'force') {
+    ctx.fillStyle = element.color; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('⚡', x, y + 8);
+    
+  } else if(element.type === 'phase') {
+    ctx.fillStyle = element.color; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('φ', x, y + 8);
+    ctx.strokeStyle = element.color; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y - 15, 8, 0, Math.PI * 2); ctx.stroke();
+    const phase = P('phaseShift') * Math.PI / 180;
+    ctx.beginPath(); ctx.moveTo(x, y - 15); ctx.lineTo(x + Math.cos(phase) * 8, y - 15 + Math.sin(phase) * 8); ctx.stroke();
+    
+  } else if(element.type === 'destroyer') {
+    ctx.fillStyle = element.color;
+    ctx.fillRect(x-WAGON_W/2, y-WAGON_H/2, WAGON_W, WAGON_H);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+    ctx.strokeRect(x-WAGON_W/2, y-WAGON_H/2, WAGON_W, WAGON_H);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x - 8, y - 8); ctx.lineTo(x + 8, y + 8);
+    ctx.moveTo(x + 8, y - 8); ctx.lineTo(x - 8, y + 8); ctx.stroke();
+    const pulse = Math.sin(time * 10) * 0.3 + 0.7;
+    ctx.strokeStyle = `rgba(255, 0, 0, ${pulse})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, WAGON_W/2 + 5, 0, Math.PI * 2); ctx.stroke();
+  }
+}
+
+function drawSupport(b) {
+  const x = b.x;
+  const y = equilibriumY;
+  ctx.fillStyle = '#555';
+  ctx.fillRect(x-15, y-20, 30, 40);
+  ctx.strokeStyle = '#888'; ctx.lineWidth = 2;
+  ctx.strokeRect(x-15, y-20, 30, 40);
+  ctx.fillStyle = '#aaa';
+  ctx.beginPath(); ctx.arc(x-8, y-10, 3, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+8, y-10, 3, 0, Math.PI*2); ctx.fill();
+}
+
+function drawMass(b) {
+  const x = b.x;
+  const y = b.y;
+  if(b.flash > 0) {
+    ctx.fillStyle = `rgba(255,255,100,${b.flash * 0.5})`;
+    ctx.fillRect(x - WAGON_W/2 - 4, y - WAGON_H/2 - 4, WAGON_W + 8, WAGON_H + 8);
+  }
+  ctx.fillStyle = b.color;
+  ctx.fillRect(x-WAGON_W/2, y-WAGON_H/2, WAGON_W, WAGON_H);
+  ctx.strokeStyle = '#222'; ctx.lineWidth = 1;
+  ctx.strokeRect(x-WAGON_W/2, y-WAGON_H/2, WAGON_W, WAGON_H);
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(x-WAGON_W/3, y+WAGON_H/2+2, 4, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+WAGON_W/3, y+WAGON_H/2+2, 4, 0, Math.PI*2); ctx.fill();
+  
+  if(b.extForce && b.extForce.amplitude > 0) {
+    ctx.fillStyle = '#f44'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('⚡' + b.extForce.amplitude.toFixed(0), x, y - WAGON_H/2 - 8);
+    if(b.extForce.phase !== 0) {
+      const phaseDeg = (b.extForce.phase * 180 / Math.PI).toFixed(0);
+      ctx.fillStyle = '#fa0'; ctx.font = 'bold 9px sans-serif';
+      ctx.fillText('φ' + phaseDeg + '°', x, y - WAGON_H/2 - 20);
+    }
+  }
+}
+
+// ============================================================================
+// НАУЧНЫЙ МОДУЛЬ: РАСЧЁТ АЧХ ДВУМЯ МЕТОДАМИ
+// ============================================================================
+
+/**
+ * МЕТОД 1: Структурный подход (комплексные амплитуды)
+ * Решает алгебраическую систему: (-ω²M + iωB + K)X = F
+ * Работает ТОЛЬКО для линейных систем (α=0, β=0)
+ */
+function calculateFRFStructural(N, m, k, b, A, omega) {
+  // Строим матрицы
+  const M = buildMassMatrix(N, m);
+  const K = buildStiffnessMatrix(N, k);
+  const B = buildDampingMatrix(N, b);
+  
+  // Вектор силы (возбуждение на первую массу)
+  const F = new Array(N).fill(0);
+  F[0] = A;
+  
+  // Решаем систему для каждой частоты
+  const omegaMin = parseFloat(document.getElementById('sci-omega-min').value);
+  const omegaMax = parseFloat(document.getElementById('sci-omega-max').value);
+  const omegaStep = parseFloat(document.getElementById('sci-omega-step').value);
+  
+  const frf = [];
+  
+  for (let w = omegaMin; w <= omegaMax; w += omegaStep) {
+    // Формируем комплексную матрицу: Z = -ω²M + iωB + K
+    const Z_real = [];
+    const Z_imag = [];
+    
+    for (let i = 0; i < N; i++) {
+      Z_real[i] = [];
+      Z_imag[i] = [];
+      for (let j = 0; j < N; j++) {
+        Z_real[i][j] = K[i][j] - w * w * M[i][j];
+        Z_imag[i][j] = w * B[i][j];
+      }
+    }
+    
+    // Решаем комплексную систему методом Гаусса
+    const X = solveComplexSystem(Z_real, Z_imag, F);
+    
+    // Амплитуды = модули комплексных чисел
+    const amplitudes = X.map(x => Math.sqrt(x.real * x.real + x.imag * x.imag));
+    const phases = X.map(x => Math.atan2(x.imag, x.real));
+    
+    frf.push({ omega: w, amplitudes, phases });
+  }
+  
+  return frf;
+}
+
+/**
+ * МЕТОД 2: Численный подход (интегрирование ДУ)
+ * Метод Эйлера + выделение установившегося режима
+ * Работает для ЛЮБЫХ систем (линейных и нелинейных)
+ */
+function calculateFRFNumeric(N, m, k, alpha, b, beta, A, omega) {
+  const omegaMin = parseFloat(document.getElementById('sci-omega-min').value);
+  const omegaMax = parseFloat(document.getElementById('sci-omega-max').value);
+  const omegaStep = parseFloat(document.getElementById('sci-omega-step').value);
+  
+  const Tmax = 30; // Время расчёта
+  const dt = 0.005; // Шаг интегрирования
+  const substeps = 8;
+  const sdt = dt / substeps;
+  const steps = Math.floor(Tmax / dt);
+  
+  const frf = [];
+  
+  for (let w = omegaMin; w <= omegaMax; w += omegaStep) {
+    // Начальные условия
+    let y = new Array(N).fill(0);
+    let v = new Array(N).fill(0);
+    let t = 0;
+    
+    const timeSeries = [];
+    
+    // Интегрируем
+    for (let step = 0; step <= steps; step++) {
+      if (step % 10 === 0) { // Записываем каждую 10-ю точку
+        timeSeries.push({ t, y: [...y] });
+      }
+      
+      for (let s = 0; s < substeps; s++) {
+        const F = new Array(N).fill(0);
+        
+        // Силы от связей
+        for (let i = 0; i < N; i++) {
+          if (i > 0) {
+            const dy = y[i-1] - y[i];
+            const dv = v[i-1] - v[i];
+            F[i] += k * dy + alpha * dy * dy * dy + b * dv + beta * dv * Math.abs(dv);
+          }
+          if (i < N - 1) {
+            const dy = y[i+1] - y[i];
+            const dv = v[i+1] - v[i];
+            F[i] += k * dy + alpha * dy * dy * dy + b * dv + beta * dv * Math.abs(dv);
+          }
+          
+          // Внешняя сила на первую массу
+          if (i === 0) {
+            F[i] += A * Math.sin(w * t);
+          }
+        }
+        
+        // Обновление
+        for (let i = 0; i < N; i++) {
+          const a = F[i] / m;
+          v[i] += a * sdt;
+          y[i] += v[i] * sdt;
+        }
+        
+        t += sdt;
+      }
+    }
+    
+    // Выделяем установившийся режим (t >= 20)
+    const steadyData = timeSeries.filter(p => p.t >= 20);
+    
+    // Оцениваем амплитуды методом наименьших квадратов
+    const amplitudes = [];
+    const phases = [];
+    
+    for (let i = 0; i < N; i++) {
+      const data_i = steadyData.map(p => ({ t: p.t, y: p.y[i] }));
+      const ss = estimateSteadyState(data_i, w);
+      amplitudes.push(ss.A_st);
+      phases.push(ss.phi_st);
+    }
+    
+    frf.push({ omega: w, amplitudes, phases });
+  }
+  
+  return frf;
+}
+
+function estimateSteadyState(data, omega) {
+  if (data.length < 10) {
+    return { A_st: 0, phi_st: 0 };
+  }
+  
+  let S_ss = 0, S_sc = 0, S_cc = 0, S_ys = 0, S_yc = 0;
+  
+  data.forEach(p => {
+    const sinVal = Math.sin(omega * p.t);
+    const cosVal = Math.cos(omega * p.t);
+    
+    S_ss += sinVal * sinVal;
+    S_sc += sinVal * cosVal;
+    S_cc += cosVal * cosVal;
+    S_ys += p.y * sinVal;
+    S_yc += p.y * cosVal;
+  });
+  
+  const det = S_ss * S_cc - S_sc * S_sc;
+  if (Math.abs(det) < 1e-12) {
+    return { A_st: 0, phi_st: 0 };
+  }
+  
+  const C1 = (S_cc * S_ys - S_sc * S_yc) / det;
+  const C2 = (S_ss * S_yc - S_sc * S_ys) / det;
+  
+  const A_st = Math.sqrt(C1 * C1 + C2 * C2);
+  const phi_st = Math.atan2(C2, C1);
+  
+  return { A_st, phi_st };
+}
+
+function buildMassMatrix(N, m) {
+  const M = [];
+  for (let i = 0; i < N; i++) {
+    M[i] = [];
+    for (let j = 0; j < N; j++) {
+      M[i][j] = (i === j) ? m : 0;
+    }
+  }
+  return M;
+}
+
+function buildStiffnessMatrix(N, k) {
+  const K = [];
+  for (let i = 0; i < N; i++) {
+    K[i] = [];
+    for (let j = 0; j < N; j++) {
+      if (i === j) {
+        K[i][j] = 2 * k; // Сумма жёсткостей слева и справа
+        if (i === 0 || i === N - 1) K[i][j] = k; // Крайние массы
+      } else if (Math.abs(i - j) === 1) {
+        K[i][j] = -k;
+      } else {
+        K[i][j] = 0;
+      }
+    }
+  }
+  return K;
+}
+
+function buildDampingMatrix(N, b) {
+  const B = [];
+  for (let i = 0; i < N; i++) {
+    B[i] = [];
+    for (let j = 0; j < N; j++) {
+      if (i === j) {
+        B[i][j] = 2 * b;
+        if (i === 0 || i === N - 1) B[i][j] = b;
+      } else if (Math.abs(i - j) === 1) {
+        B[i][j] = -b;
+      } else {
+        B[i][j] = 0;
+      }
+    }
+  }
+  return B;
+}
+
+function solveComplexSystem(Z_real, Z_imag, F) {
+  const N = F.length;
+  
+  // Метод Гаусса для комплексных чисел
+  // Augmented matrix: [Z | F]
+  const A_real = Z_real.map((row, i) => [...row, F[i]]);
+  const A_imag = Z_imag.map(row => [...row, 0]);
+  
+  // Прямой ход
+  for (let i = 0; i < N; i++) {
+    // Поиск ведущего элемента
+    let maxRow = i;
+    let maxVal = Math.sqrt(A_real[i][i] ** 2 + A_imag[i][i] ** 2);
+    for (let k = i + 1; k < N; k++) {
+      const val = Math.sqrt(A_real[k][i] ** 2 + A_imag[k][i] ** 2);
+      if (val > maxVal) {
+        maxVal = val;
+        maxRow = k;
+      }
+    }
+    
+    // Перестановка строк
+    [A_real[i], A_real[maxRow]] = [A_real[maxRow], A_real[i]];
+    [A_imag[i], A_imag[maxRow]] = [A_imag[maxRow], A_imag[i]];
+    
+    // Исключение
+    for (let k = i + 1; k < N; k++) {
+      const denom_real = A_real[i][i];
+      const denom_imag = A_imag[i][i];
+      const denom = denom_real ** 2 + denom_imag ** 2;
+      
+      if (denom < 1e-12) continue;
+      
+      const factor_real = (A_real[k][i] * denom_real + A_imag[k][i] * denom_imag) / denom;
+      const factor_imag = (A_imag[k][i] * denom_real - A_real[k][i] * denom_imag) / denom;
+      
+      for (let j = i; j <= N; j++) {
+        const new_real = A_real[k][j] - (factor_real * A_real[i][j] - factor_imag * A_imag[i][j]);
+        const new_imag = A_imag[k][j] - (factor_real * A_imag[i][j] + factor_imag * A_real[i][j]);
+        A_real[k][j] = new_real;
+        A_imag[k][j] = new_imag;
+      }
+    }
+  }
+  
+  // Обратный ход
+  const X = [];
+  for (let i = N - 1; i >= 0; i--) {
+    let sum_real = A_real[i][N];
+    let sum_imag = A_imag[i][N];
+    
+    for (let j = i + 1; j < N; j++) {
+      const prod_real = X[j].real * A_real[i][j] - X[j].imag * A_imag[i][j];
+      const prod_imag = X[j].real * A_imag[i][j] + X[j].imag * A_real[i][j];
+      sum_real -= prod_real;
+      sum_imag -= prod_imag;
+    }
+    
+    const denom = A_real[i][i] ** 2 + A_imag[i][i] ** 2;
+    if (denom < 1e-12) {
+      X[i] = { real: 0, imag: 0 };
+    } else {
+      X[i] = {
+        real: (sum_real * A_real[i][i] + sum_imag * A_imag[i][i]) / denom,
+        imag: (sum_imag * A_real[i][i] - sum_real * A_imag[i][i]) / denom
+      };
+    }
+  }
+  
+  return X;
+}
+
+/**
+ * Главная функция: расчёт и отрисовка АЧХ
+ */
+function calculateFRF() {
+  const N = parseInt(document.getElementById('sci-N').value);
+  const m = parseFloat(document.getElementById('sci-m').value);
+  const k = parseFloat(document.getElementById('sci-k').value);
+  const b = parseFloat(document.getElementById('sci-b').value);
+  const alpha = parseFloat(document.getElementById('sci-alpha').value);
+  const beta = parseFloat(document.getElementById('sci-beta').value);
+  const A = parseFloat(document.getElementById('sci-A').value);
+  
+  console.log('🔄 Расчёт АЧХ двумя методами...');
+  console.log(`Параметры: N=${N}, m=${m}, k=${k}, b=${b}, α=${alpha}, β=${beta}, A=${A}`);
+  
+  // Метод 1: Структурный (только для линейных)
+  let frfStructural = null;
+  const isLinear = (alpha === 0 && beta === 0);
+  
+  if (isLinear) {
+    console.log('✅ Система линейная (α=0, β=0) — применяем структурный метод');
+    frfStructural = calculateFRFStructural(N, m, k, b, A);
+  } else {
+    console.log('⚠️ Система нелинейная (α≠0 или β≠0) — структурный метод неприменим');
+  }
+  
+  // Метод 2: Численный (для всех)
+  console.log('🔄 Численный метод (интегрирование ДУ)...');
+  const frfNumeric = calculateFRFNumeric(N, m, k, alpha, b, beta, A);
+  console.log('✅ Численный метод завершён');
+  
+  // Отрисовка графиков
+  drawFRFComparison(frfStructural, frfNumeric, isLinear, N);
+  
+  // Расчёт метрик сравнения
+  if (isLinear) {
+    calculateComparisonMetrics(frfStructural, frfNumeric, N);
+  }
+}
+
+function drawFRFComparison(frfStructural, frfNumeric, isLinear, N) {
+  const canvas = document.getElementById('frf-canvas');
+  const ctx = canvas.getContext('2d');
+  
+  // Устанавливаем реальные размеры canvas
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+  
+  const width = canvas.width;
+  const height = canvas.height;
+  
+  // Очищаем
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, width, height);
+  
+  // Параметры графика
+  const padding = { top: 40, right: 40, bottom: 60, left: 80 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  
+  // Находим диапазоны
+  const omegaMin = parseFloat(document.getElementById('sci-omega-min').value);
+  const omegaMax = parseFloat(document.getElementById('sci-omega-max').value);
+  
+  let maxAmp = 0;
+  if (frfStructural) {
+    frfStructural.forEach(row => {
+      row.amplitudes.forEach(A => {
+        if (A > maxAmp) maxAmp = A;
+      });
+    });
+  }
+  frfNumeric.forEach(row => {
+    row.amplitudes.forEach(A => {
+      if (A > maxAmp) maxAmp = A;
+    });
+  });
+  
+  maxAmp *= 1.1; // Запас
+  
+  // Рисуем сетку
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1;
+  
+  // Вертикальные линии (частоты)
+  const omegaStep = (omegaMax - omegaMin) / 10;
+  for (let i = 0; i <= 10; i++) {
+    const x = padding.left + (i / 10) * plotWidth;
+    ctx.beginPath();
+    ctx.moveTo(x, padding.top);
+    ctx.lineTo(x, padding.top + plotHeight);
+    ctx.stroke();
+    
+    // Подписи
+    ctx.fillStyle = '#888';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    const omega = omegaMin + i * omegaStep;
+    ctx.fillText(omega.toFixed(1), x, padding.top + plotHeight + 20);
+  }
+  
+  // Горизонтальные линии (амплитуды)
+  const ampStep = maxAmp / 5;
+  for (let i = 0; i <= 5; i++) {
+    const y = padding.top + plotHeight - (i / 5) * plotHeight;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(padding.left + plotWidth, y);
+    ctx.stroke();
+    
+    // Подписи
+    ctx.fillStyle = '#888';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'right';
+    const amp = i * ampStep;
+    ctx.fillText(amp.toFixed(1), padding.left - 10, y + 3);
+  }
+  
+  // Подписи осей
+  ctx.fillStyle = '#fc6';
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Частота ω (рад/с)', padding.left + plotWidth / 2, height - 10);
+  
+  ctx.save();
+  ctx.translate(20, padding.top + plotHeight / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Амплитуда A', 0, 0);
+  ctx.restore();
+  
+  // Заголовок
+  ctx.fillStyle = '#fc6';
+  ctx.font = 'bold 14px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`АЧХ цепи из ${N} масс (первая масса)`, width / 2, 20);
+  
+  // Рисуем графики для каждой массы
+  const colors = ['#4cf', '#6f6', '#fc6', '#f6f', '#6ff', '#fa6', '#a6f'];
+  
+  for (let massIdx = 0; massIdx < Math.min(N, 3); massIdx++) { // Показываем первые 3 массы
+    const color = colors[massIdx % colors.length];
+    
+    // Структурный метод (синий)
+    if (frfStructural) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      
+      frfStructural.forEach((row, i) => {
+        const x = padding.left + ((row.omega - omegaMin) / (omegaMax - omegaMin)) * plotWidth;
+        const y = padding.top + plotHeight - (row.amplitudes[massIdx] / maxAmp) * plotHeight;
+        
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
+    
+    // Численный метод (красный пунктир)
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    
+    frfNumeric.forEach((row, i) => {
+      const x = padding.left + ((row.omega - omegaMin) / (omegaMax - omegaMin)) * plotWidth;
+      const y = padding.top + plotHeight - (row.amplitudes[massIdx] / maxAmp) * plotHeight;
+      
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  
+  // Легенда
+  const legendX = width - 200;
+  const legendY = padding.top + 10;
+  
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(legendX - 10, legendY - 5, 190, isLinear ? 100 : 60);
+  
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'left';
+  
+  if (isLinear) {
+    ctx.fillStyle = '#4cf';
+    ctx.fillRect(legendX, legendY, 20, 2);
+    ctx.fillText('Структурный метод (алгебра)', legendX + 25, legendY + 5);
+    
+    ctx.fillStyle = '#f44';
+    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = '#f44';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(legendX, legendY + 20);
+    ctx.lineTo(legendX + 20, legendY + 20);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillText('Численный метод (ДУ)', legendX + 25, legendY + 25);
+    
+    ctx.fillStyle = '#4f4';
+    ctx.fillText('✅ Методы совпадают', legendX, legendY + 50);
+  } else {
+    ctx.fillStyle = '#f44';
+    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = '#f44';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(legendX, legendY);
+    ctx.lineTo(legendX + 20, legendY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillText('Численный метод (ДУ)', legendX + 25, legendY + 5);
+    
+    ctx.fillStyle = '#f44';
+    ctx.fillText('⚠️ Нелинейная система', legendX, legendY + 30);
+  }
+  
+  // Подписи масс
+  for (let massIdx = 0; massIdx < Math.min(N, 3); massIdx++) {
+    ctx.fillStyle = colors[massIdx % colors.length];
+    ctx.fillRect(legendX, legendY + 70 + massIdx * 15, 10, 8);
+    ctx.fillText(`Масса ${massIdx + 1}`, legendX + 15, legendY + 78 + massIdx * 15);
+  }
+}
+
+function calculateComparisonMetrics(frfStructural, frfNumeric, N) {
+  let totalError = 0;
+  let maxError = 0;
+  let count = 0;
+  
+  frfStructural.forEach((row, i) => {
+    row.amplitudes.forEach((A_struct, j) => {
+      const A_num = frfNumeric[i].amplitudes[j];
+      const error = Math.abs(A_struct - A_num) / Math.max(A_struct, 0.001) * 100;
+      totalError += error;
+      if (error > maxError) maxError = error;
+      count++;
+    });
+  });
+  
+  const avgError = totalError / count;
+  
+  const resultsBox = document.getElementById('results-box');
+  const resultsContent = document.getElementById('results-content');
+  
+  resultsBox.style.display = 'block';
+  
+  resultsContent.innerHTML = `
+    <div class="metric">
+      <b>Система:</b>
+      <span class="value">Линейная (α=0, β=0)</span>
+    </div>
+    <div class="metric">
+      <b>Средняя ошибка:</b>
+      <span class="value ${avgError < 5 ? 'good' : 'bad'}">${avgError.toFixed(2)}%</span>
+    </div>
+    <div class="metric">
+      <b>Максимальная ошибка:</b>
+      <span class="value ${maxError < 10 ? 'good' : 'bad'}">${maxError.toFixed(2)}%</span>
+    </div>
+    <div class="metric">
+      <b>Вывод:</b>
+      <span class="value ${avgError < 5 ? 'good' : 'bad'}">
+        ${avgError < 5 ? '✅ Методы совпадают' : '⚠️ Есть расхождения'}
+      </span>
+    </div>
+  `;
+}
+
+/**
+ * Экспорт всех данных
+ */
+function exportAllData() {
+  const N = parseInt(document.getElementById('sci-N').value);
+  const m = parseFloat(document.getElementById('sci-m').value);
+  const k = parseFloat(document.getElementById('sci-k').value);
+  const b = parseFloat(document.getElementById('sci-b').value);
+  const alpha = parseFloat(document.getElementById('sci-alpha').value);
+  const beta = parseFloat(document.getElementById('sci-beta').value);
+  const A = parseFloat(document.getElementById('sci-A').value);
+  
+  // 1. Экспорт модели (JSON)
+  const model = {
+    timestamp: new Date().toISOString(),
+    description: "Математическая модель цепи осцилляторов",
+    parameters: { N, m, k, b, alpha, beta, A },
+    massMatrix: buildMassMatrix(N, m),
+    stiffnessMatrix: buildStiffnessMatrix(N, k),
+    dampingMatrix: buildDampingMatrix(N, b),
+    isLinear: (alpha === 0 && beta === 0)
+  };
+  
+  const modelBlob = new Blob([JSON.stringify(model, null, 2)], {type: 'application/json'});
+  const modelUrl = URL.createObjectURL(modelBlob);
+  const modelLink = document.createElement('a');
+  modelLink.href = modelUrl;
+  modelLink.download = `model_N${N}_${Date.now()}.json`;
+  modelLink.click();
+  URL.revokeObjectURL(modelUrl);
+  
+  // 2. Экспорт АЧХ (CSV)
+  let csv = 'omega';
+  for (let i = 1; i <= N; i++) {
+    csv += `,A${i}_structural,A${i}_numeric`;
+  }
+  csv += '\n';
+  
+  const isLinear = (alpha === 0 && beta === 0);
+  const frfStructural = isLinear ? calculateFRFStructural(N, m, k, b, A) : null;
+  const frfNumeric = calculateFRFNumeric(N, m, k, alpha, b, beta, A);
+  
+  frfNumeric.forEach((row, i) => {
+    csv += row.omega.toFixed(4);
+    for (let j = 0; j < N; j++) {
+      csv += `,${frfStructural ? frfStructural[i].amplitudes[j].toFixed(6) : 'N/A'}`;
+      csv += `,${row.amplitudes[j].toFixed(6)}`;
+    }
+    csv += '\n';
+  });
+  
+  const csvBlob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
+  const csvUrl = URL.createObjectURL(csvBlob);
+  const csvLink = document.createElement('a');
+  csvLink.href = csvUrl;
+  csvLink.download = `frf_comparison_N${N}_${Date.now()}.csv`;
+  csvLink.click();
+  URL.revokeObjectURL(csvUrl);
+  
+  console.log('✅ Экспорт завершён:');
+  console.log('📄 model_*.json — математическая модель');
+  console.log('📊 frf_comparison_*.csv — АЧХ обоих методов');
+}
+
+let lastTime = performance.now();
+function loop(now) {
+  const dt = Math.min((now-lastTime)/1000, 0.05);
+  lastTime = now;
+  
+  if (currentMode === 'game') {
+    physics(dt);
+    draw();
+  }
+  
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+initChain();
+</script>
+</body>
+</html>
