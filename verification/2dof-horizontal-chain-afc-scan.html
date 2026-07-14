@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>АЧХ: 2-DOF (с коэфф. передачи)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a1a;color:#e0e0e0;font-family:sans-serif;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+h2{text-align:center;font-size:14px;padding:10px;background:#252525;border-bottom:1px solid #444}
+.workspace{display:flex;flex:1;flex-direction:row}
+@media(max-width:600px){.workspace{flex-direction:column}}
+canvas{background:#222;display:block}
+#simCanvas{flex:1;border-right:1px solid #444}
+#graphCanvas{flex:1}
+.controls{background:#252525;padding:10px;border-top:1px solid #444;display:flex;flex-direction:column;gap:6px;max-height:45vh;overflow-y:auto}
+.sg{display:flex;align-items:center;justify-content:space-between}
+.sg label{font-size:12px;width:95px}
+.sg input{flex:1;margin:0 6px;accent-color:#4caf50}
+.sg span{font-size:12px;color:#4caf50;font-weight:bold;width:30px;text-align:right}
+.sg select{flex:1;background:#333;color:#fff;border:1px solid #555;border-radius:4px;padding:4px;font-size:12px}
+.btn-row{display:flex;gap:8px;margin-top:6px}
+button{flex:1;padding:10px;border:none;border-radius:6px;font-size:13px;font-weight:bold;cursor:pointer;color:white}
+#scanBtn{background:#4caf50}
+#resetBtn{background:#f44336}
+.status{text-align:center;font-size:11px;color:#aaa;margin-top:4px}
+.legend{display:flex;justify-content:center;gap:8px;font-size:10px;color:#ccc;margin-top:4px;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:3px}
+.dot{width:8px;height:8px;border-radius:50%}
+.line{width:12px;height:0;border-top:2px dashed}
+</style>
+</head>
+<body>
+<h2>2-DOF: Динамическая податливость и передача</h2>
+<div class="workspace">
+<canvas id="simCanvas"></canvas>
+<canvas id="graphCanvas"></canvas>
+</div>
+<div class="controls">
+<div class="sg"><label>Масса m₁</label><input type="range" id="m1" min="1" max="20" value="5" step="1"><span id="m1Val">5</span></div>
+<div class="sg"><label>Масса m₂</label><input type="range" id="m2" min="1" max="20" value="5" step="1"><span id="m2Val">5</span></div>
+<div class="sg"><label>Жёсткость k₁</label><input type="range" id="k1" min="10" max="200" value="50" step="5"><span id="k1Val">50</span></div>
+<div class="sg"><label>Жёсткость k₁₂</label><input type="range" id="k12" min="0" max="100" value="20" step="5"><span id="k12Val">20</span></div>
+<div class="sg"><label>Жёсткость k₂</label><input type="range" id="k2" min="10" max="200" value="50" step="5"><span id="k2Val">50</span></div>
+<div class="sg"><label>Демпфер c₁</label><input type="range" id="c1" min="0.1" max="5" value="1" step="0.1"><span id="c1Val">1.0</span></div>
+<div class="sg"><label>Демпфер c₂</label><input type="range" id="c2" min="0.1" max="5" value="1" step="0.1"><span id="c2Val">1.0</span></div>
+<div class="sg"><label>Установление (T)</label><input type="range" id="settleT" min="1" max="10" value="3" step="1"><span id="settleTVal">3</span></div>
+<div class="sg"><label>Сила приложена к:</label>
+<select id="forceOn"><option value="1">m₁</option><option value="2">m₂</option></select>
+</div>
+<div class="sg"><label>Режим графика:</label>
+<select id="viewMode"><option value="amps">Амплитуды y₁, y₂</option><option value="trans">Коэфф. передачи |y₂/y₁|</option></select>
+</div>
+<div class="btn-row">
+<button id="scanBtn">▶ Сканировать</button>
+<button id="resetBtn">🔄 Сброс</button>
+</div>
+<div class="status" id="status">Готов к сканированию</div>
+<div class="legend" id="legendBox">
+<div class="legend-item"><div class="dot" style="background:#2196f3"></div>y₁ модель</div>
+<div class="legend-item"><div class="line" style="border-color:#2196f3"></div>y₁ теория</div>
+<div class="legend-item"><div class="dot" style="background:#ff9800"></div>y₂ модель</div>
+<div class="legend-item"><div class="line" style="border-color:#ff9800"></div>y₂ теория</div>
+</div>
+</div>
+<script>
+const simC=document.getElementById('simCanvas'),simX=simC.getContext('2d');
+const grC=document.getElementById('graphCanvas'),grX=grC.getContext('2d');
+let m1=5,m2=5,k1=50,k12=20,k2=50,c1=1,c2=1,settleT=3,forceOn=1,viewMode='amps';
+let y1=0,y2=0,v1=0,v2=0,t=0,F0=20,fW=0;
+let pts1=[],pts2=[],ptsT=[],scanning=false,scanW=0.5,step=0.3,mTime=0,mA1=0,mA2=0;
+
+function resize(){
+simC.width=simC.clientWidth;simC.height=simC.clientHeight;
+grC.width=grC.clientWidth;grC.height=grC.clientHeight;
+}
+window.addEventListener('resize',resize);
+setTimeout(resize,100);
+
+['m1','m2','k1','k12','k2','c1','c2','settleT'].forEach(id=>{
+document.getElementById(id).addEventListener('input',e=>{
+document.getElementById(id+'Val').textContent=e.target.value;
+m1=+document.getElementById('m1').value;
+m2=+document.getElementById('m2').value;
+k1=+document.getElementById('k1').value;
+k12=+document.getElementById('k12').value;
+k2=+document.getElementById('k2').value;
+c1=+document.getElementById('c1').value;
+c2=+document.getElementById('c2').value;
+settleT=+document.getElementById('settleT').value;
+reset();
+});
+});
+document.getElementById('forceOn').addEventListener('change',e=>{forceOn=+e.target.value;reset();});
+document.getElementById('viewMode').addEventListener('change',e=>{
+viewMode=e.target.value;
+const leg=document.getElementById('legendBox');
+if(viewMode==='amps'){
+leg.innerHTML=`<div class="legend-item"><div class="dot" style="background:#2196f3"></div>y₁ модель</div>
+<div class="legend-item"><div class="line" style="border-color:#2196f3"></div>y₁ теория</div>
+<div class="legend-item"><div class="dot" style="background:#ff9800"></div>y₂ модель</div>
+<div class="legend-item"><div class="line" style="border-color:#ff9800"></div>y₂ теория</div>`;
+}else{
+leg.innerHTML=`<div class="legend-item"><div class="dot" style="background:#e040fb"></div>|y₂/y₁| модель</div>
+<div class="legend-item"><div class="line" style="border-color:#e040fb"></div>|y₂/y₁| теория</div>`;
+}
+reset();
+});
+
+function reset(){
+y1=y2=v1=v2=t=0;mA1=mA2=mTime=0;
+pts1=[];pts2=[];ptsT=[];scanning=false;scanW=0.5;
+document.getElementById('status').textContent='Сброшено';
+}
+
+function physics(dt){
+const F1 = (forceOn === 1) ? F0 * Math.sin(fW * t) : 0;
+const F2 = (forceOn === 2) ? F0 * Math.sin(fW * t) : 0;
+const a1 = (-k1*y1 + k12*(y2-y1) - c1*v1 + F1) / m1;
+const a2 = (-k2*y2 - k12*(y2-y1) - c2*v2 + F2) / m2;
+v1 += a1*dt; v2 += a2*dt;
+y1 += v1*dt; y2 += v2*dt;
+t += dt;
+}
+
+function analytic(w){
+const A = k1 + k12 - w*w*m1;
+const B = w * c1;
+const D = k2 + k12 - w*w*m2;
+const E = w * c2;
+const C = -k12;
+const detR = A*D - B*E - C*C;
+const detI = A*E + B*D;
+const mag2 = detR*detR + detI*detI;
+if(mag2 < 1e-12) return {A1:0, A2:0, T:0};
+
+const H11r = (D*detR + E*detI) / mag2;
+const H11i = (E*detR - D*detI) / mag2;
+const H12r = (-C*detR) / mag2; // H21 = H12
+const H12i = (-C*detI) / mag2;
+const H22r = (A*detR + B*detI) / mag2;
+const H22i = (B*detR - A*detI) / mag2;
+
+let A1=0, A2=0, T=0;
+if(forceOn === 1){
+A1 = Math.sqrt(H11r*H11r+H11i*H11i)*F0;
+A2 = Math.sqrt(H12r*H12r+H12i*H12i)*F0;
+// T = |H21 / H11|
+const numR = H12r*H11r + H12i*H11i;
+const numI = H12i*H11r - H12r*H11i;
+const den = H11r*H11r + H11i*H11i;
+T = (den > 1e-12) ? Math.sqrt(numR*numR + numI*numI) / den : 0;
+} else {
+A1 = Math.sqrt(H12r*H12r+H12i*H12i)*F0;
+A2 = Math.sqrt(H22r*H22r+H22i*H22i)*F0;
+// T = |H22 / H12|
+const numR = H22r*H12r + H22i*H12i;
+const numI = H22i*H12r - H22r*H12i;
+const den = H12r*H12r + H12i*H12i;
+T = (den > 1e-12) ? Math.sqrt(numR*numR + numI*numI) / den : 0;
+}
+return {A1, A2, T};
+}
+
+function drawSpring(x1,y1,x2,y2){
+const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);
+if(len<5)return;
+const ux=dx/len,uy=dy/len,px=-uy,py=ux;
+simX.beginPath();simX.moveTo(x1,y1);
+const n=8,seg=len/(n*2+2);
+let cx=x1+ux*seg,cy=y1+uy*seg;
+simX.lineTo(cx,cy);
+for(let i=0;i<n*2;i++){
+const s=(i%2===0)?1:-1;
+cx+=ux*seg;cy+=uy*seg;
+simX.lineTo(cx+px*10*s,cy+py*10*s);
+}
+cx+=ux*seg;cy+=uy*seg;
+simX.lineTo(cx,cy);
+simX.stroke();
+}
+
+function drawSim(){
+const W=simC.width,H=simC.height;
+simX.clearRect(0,0,W,H);
+const eqY=H/2;
+const scale=25;
+let ym1 = eqY + y1 * scale;
+let ym2 = eqY + y2 * scale;
+ym1 = Math.max(15, Math.min(H-15, ym1));
+ym2 = Math.max(15, Math.min(H-15, ym2));
+
+const xs1=40,xm1=W*0.35,xm2=W*0.65,xs2=W-40;
+
+simX.fillStyle='#555';
+simX.fillRect(xs1-8,eqY-35,16,70);
+simX.fillRect(xs2-8,eqY-35,16,70);
+
+simX.strokeStyle='#4caf50';simX.lineWidth=2;
+drawSpring(xs1,eqY,xm1,ym1);
+drawSpring(xm1,ym1,xm2,ym2);
+drawSpring(xm2,ym2,xs2,eqY);
+
+simX.fillStyle='#2196f3';
+simX.fillRect(xm1-22,ym1-18,44,36);
+simX.strokeStyle='#fff';simX.lineWidth=2;
+simX.strokeRect(xm1-22,ym1-18,44,36);
+simX.fillStyle='#fff';simX.font='bold 13px sans-serif';
+simX.textAlign='center';simX.textBaseline='middle';
+simX.fillText('m₁',xm1,ym1);
+
+simX.fillStyle='#ff9800';
+simX.fillRect(xm2-22,ym2-18,44,36);
+simX.strokeStyle='#fff';simX.lineWidth=2;
+simX.strokeRect(xm2-22,ym2-18,44,36);
+simX.fillStyle='#fff';
+simX.fillText('m₂',xm2,ym2);
+
+const fx = (forceOn === 1) ? xm1 : xm2;
+const fy = (forceOn === 1) ? ym1 : ym2;
+const F = F0*Math.sin(fW*t);
+const arr = F * 1.0;
+simX.strokeStyle='#f44336';simX.fillStyle='#f44336';simX.lineWidth=3;
+simX.beginPath();simX.moveTo(fx,fy+22);simX.lineTo(fx,fy+22+arr);simX.stroke();
+if(Math.abs(arr)>5){
+const tip=fy+22+arr,d=arr>0?1:-1;
+simX.beginPath();simX.moveTo(fx,tip);
+simX.lineTo(fx-5,tip-7*d);simX.lineTo(fx+5,tip-7*d);
+simX.closePath();simX.fill();
+}
+
+simX.strokeStyle='#666';simX.setLineDash([4,4]);simX.lineWidth=1;
+simX.beginPath();simX.moveTo(20,eqY);simX.lineTo(W-20,eqY);simX.stroke();simX.setLineDash([]);
+
+simX.fillStyle='#aaa';simX.font='11px monospace';simX.textAlign='left';
+simX.fillText(`y₁: ${y1.toFixed(3)}`, 10, 20);
+simX.fillText(`y₂: ${y2.toFixed(3)}`, 10, 35);
+}
+
+function drawGraph(){
+const W=grC.width,H=grC.height;
+grX.clearRect(0,0,W,H);
+const M={l:40,r:10,t:10,b:30};
+const pW=W-M.l-M.r,pH=H-M.t-M.b,mW=15;
+
+let mA=1;
+if(viewMode==='amps'){
+for(let i=0;i<=50;i++){
+const w=(i/50)*mW;const{A1,A2}=analytic(w);
+if(A1>mA)mA=A1;if(A2>mA)mA=A2;
+}
+}else{
+for(let i=0;i<=50;i++){
+const w=(i/50)*mW;const{T}=analytic(w);
+if(T>mA)mA=T;
+}
+}
+mA=Math.min(mA*1.2, 20); // Ограничим масштаб для коэфф. передачи
+
+grX.strokeStyle='#888';grX.lineWidth=1.5;
+grX.beginPath();grX.moveTo(M.l,M.t);grX.lineTo(M.l,M.t+pH);grX.lineTo(M.l+pW,M.t+pH);grX.stroke();
+
+grX.fillStyle='#aaa';grX.font='10px sans-serif';grX.textAlign='center';
+grX.fillText('ω, рад/с',M.l+pW/2,H-5);
+grX.save();grX.translate(10,M.t+pH/2);grX.rotate(-Math.PI/2);
+grX.fillText(viewMode==='amps'?'Амплитуда A':'Коэфф. передачи',0,0);
+grX.restore();
+
+grX.strokeStyle='#333';grX.lineWidth=1;grX.beginPath();
+for(let i=0;i<=5;i++){
+const py=M.t+pH-(i/5)*pH;
+grX.moveTo(M.l,py);grX.lineTo(M.l+pW,py);
+grX.fillStyle='#888';grX.textAlign='right';
+grX.fillText(((i/5)*mA).toFixed(1),M.l-3,py+3);
+const px=M.l+(i/5)*pW;
+grX.moveTo(px,M.t+pH);grX.lineTo(px,M.t+pH+4);
+grX.textAlign='center';grX.fillText(((i/5)*mW).toFixed(1),px,M.t+pH+15);
+}
+grX.stroke();
+
+if(viewMode==='amps'){
+grX.strokeStyle='rgba(33,150,243,0.7)';grX.lineWidth=2;grX.setLineDash([5,3]);
+grX.beginPath();
+for(let i=0;i<=pW;i++){
+const w=(i/pW)*mW;const{A1}=analytic(w);
+const py=M.t+pH-(A1/mA)*pH;
+if(i===0)grX.moveTo(M.l+i,py);else grX.lineTo(M.l+i,py);
+}
+grX.stroke();
+grX.fillStyle='#2196f3';
+pts1.forEach(p=>{
+const px=M.l+(p.w/mW)*pW;const py=M.t+pH-(p.a/mA)*pH;
+grX.beginPath();grX.arc(px,py,3,0,Math.PI*2);grX.fill();
+});
+
+grX.strokeStyle='rgba(255,152,0,0.7)';
+grX.beginPath();
+for(let i=0;i<=pW;i++){
+const w=(i/pW)*mW;const{A2}=analytic(w);
+const py=M.t+pH-(A2/mA)*pH;
+if(i===0)grX.moveTo(M.l+i,py);else grX.lineTo(M.l+i,py);
+}
+grX.stroke();grX.setLineDash([]);
+grX.fillStyle='#ff9800';
+pts2.forEach(p=>{
+const px=M.l+(p.w/mW)*pW;const py=M.t+pH-(p.a/mA)*pH;
+grX.beginPath();grX.arc(px,py,3,0,Math.PI*2);grX.fill();
+});
+} else {
+// Режим коэффициента передачи
+grX.strokeStyle='rgba(224,64,251,0.8)';grX.lineWidth=2;grX.setLineDash([5,3]);
+grX.beginPath();
+for(let i=0;i<=pW;i++){
+const w=(i/pW)*mW;const{T}=analytic(w);
+const py=M.t+pH-(T/mA)*pH;
+if(i===0)grX.moveTo(M.l+i,py);else grX.lineTo(M.l+i,py);
+}
+grX.stroke();grX.setLineDash([]);
+
+grX.fillStyle='#e040fb';
+ptsT.forEach(p=>{
+const px=M.l+(p.w/mW)*pW;const py=M.t+pH-(p.a/mA)*pH;
+grX.beginPath();grX.arc(px,py,4,0,Math.PI*2);grX.fill();
+});
+}
+}
+
+let last=performance.now();
+function loop(now){
+const dt=Math.min((now-last)/1000,0.05);
+last=now;
+if(scanning){
+fW=scanW;physics(dt);
+if(Math.abs(y1)>mA1)mA1=Math.abs(y1);
+if(Math.abs(y2)>mA2)mA2=Math.abs(y2);
+mTime+=dt;
+const T=(scanW>0.1)?(2*Math.PI/scanW):10;
+if(mTime > T * settleT){
+if(viewMode==='amps'){
+pts1.push({w:scanW,a:mA1});
+pts2.push({w:scanW,a:mA2});
+}else{
+const T_num = (mA1 > 1e-6) ? (mA2 / mA1) : 0;
+ptsT.push({w:scanW, a: T_num});
+}
+scanW+=step;mTime=mA1=mA2=0;
+y1=y2=v1=v2=0;
+if(scanW>15){
+scanning=false;
+document.getElementById('status').textContent='Готово!';
+}else{
+document.getElementById('status').textContent='ω = '+scanW.toFixed(1)+' (ждём '+settleT+'T)';
+}
+}
+}else{physics(dt);}
+drawSim();drawGraph();
+requestAnimationFrame(loop);
+}
+
+document.getElementById('scanBtn').addEventListener('click',()=>{
+if(scanning)return;reset();scanning=true;
+document.getElementById('status').textContent='Сканирование...';
+});
+document.getElementById('resetBtn').addEventListener('click',reset);
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
