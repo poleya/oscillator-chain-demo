@@ -187,7 +187,6 @@ Structural modeling of oscillatory systems
 
 --
 
----
 
 ## 🔬 Модули верификации (Verification Modules)
 
@@ -203,21 +202,22 @@ Structural modeling of oscillatory systems
 
 | Файл | Описание | Спецификация |
 |------|----------|--------------|
-| [`verification/1dof-vertical-afc-scan.html`](verification/1dof-vertical-afc-scan.html) | Линейная система с 1 степенью свободы. Вертикальные колебания массы на пружине с демпфером. Численное построение АЧХ методом частотного сканирования с наложением аналитической кривой. | [`SPEC_verification_1DOF_vertical.md`](verification/SPEC_verification_1DOF_vertical.md) |
+| [`verification/1dof-vertical-afc-scan.html`](verification/1dof-vertical-afc-scan.html) | Линейная система с 1 степенью свободы. Вертикальные колебания массы. Базовая верификация алгоритма частотного сканирования. | [`SPEC_verification_1DOF_vertical.md`](verification/SPEC_verification_1DOF_vertical.md) |
+| [`verification/2dof-horizontal-chain-afc-scan.html`](verification/2dof-horizontal-chain-afc-scan.html) | Линейная система с 2 степенями свободы. Горизонтальная цепь, вертикальные колебания. **Силовое** возбуждение массы. Матрица динамической податливости, коэффициент передачи \|y₂/y₁\|. | [`SPEC_verification_2DOF_horizontal.md`](verification/SPEC_verification_2DOF_horizontal.md) |
+| [`verification/2dof-horizontal-chain-kinematic-afc-scan.html`](verification/2dof-horizontal-chain-kinematic-afc-scan.html) | Линейная система с 2 степенями свободы. Горизонтальная цепь, вертикальные колебания. **Кинематическое** возбуждение опоры (перемещение). Задача виброзащиты, коэффициент передачи \|y₂/y₁\|. | [`SPEC_verification_2DOF_kinematic.md`](verification/SPEC_verification_2DOF_kinematic.md) |
 
 ### Запланированные модули верификации:
 
-- **2-DOF система** — две связанные массы, два резонансных пика, эффект биений, демонстрация динамического гасителя колебаний.
 - **Нелинейная жёсткость (осциллятор Дуффинга)** — изгиб резонансной кривой, гистерезис, субгармоники.
 - **Экспорт и анализ** — генерация CSV/JSON, расчёт фазовых траекторий, спектральный анализ (FFT).
+- **Структурный конструктор** — Drag-and-drop сборка схем, автоматическая генерация уравнений состояния.
 
 > **Принцип разработки:** Каждый модуль верификации разрабатывается по модели 
 > «база + ветви» — сохраняется единый интерфейс и подход к частотному 
 > сканированию, но усложняется физическая модель системы.
 
+---
+
+**Ключевые слова:** oscillatory systems, structural modeling, vibration mechanics, Duffing oscillator, FRF analysis, educational software, gamification, Eliseev school, kinematic excitation.
 
 
-
-
-**Ключевые слова:** oscillatory systems, structural modeling, vibration mechanics,
-Duffing oscillator, FRF analysis, educational software, gamification, Eliseev school
