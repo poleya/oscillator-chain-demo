@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>АЧХ: Сравнение модели и теории</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { 
+    background: #1a1a1a; color: #e0e0e0; font-family: sans-serif; 
+    display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+  }
+  h2 { text-align: center; font-size: 15px; padding: 10px; background: #252525; border-bottom: 1px solid #444; }
+  
+  .workspace {
+    display: flex; flex: 1; flex-direction: row;
+  }
+  @media (max-width: 600px) {
+    .workspace { flex-direction: column; }
+  }
+
+  canvas { background: #222; display: block; }
+  #simCanvas { flex: 1; border-right: 1px solid #444; }
+  #graphCanvas { flex: 1; }
+
+  .controls {
+    background: #252525; padding: 15px; border-top: 1px solid #444;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .slider-group { display: flex; align-items: center; justify-content: space-between; }
+  .slider-group label { font-size: 14px; width: 110px; }
+  .slider-group input { flex: 1; margin: 0 10px; accent-color: #4caf50; }
+  .slider-group span { font-size: 14px; color: #4caf50; font-weight: bold; width: 40px; text-align: right; }
+
+  .btn-row { display: flex; gap: 10px; margin-top: 5px; }
+  button {
+    flex: 1; padding: 14px; border: none; border-radius: 8px;
+    font-size: 15px; font-weight: bold; cursor: pointer; color: white;
+  }
+  #scanBtn { background: #4caf50; }
+  #scanBtn:active { background: #388e3c; }
+  #resetBtn { background: #f44336; }
+  #resetBtn:active { background: #d32f2f; }
+  
+  .status { text-align: center; font-size: 13px; color: #aaa; margin-top: 5px; min-height: 20px;}
+  
+  .legend {
+    display: flex; justify-content: center; gap: 15px; font-size: 11px; color: #ccc; margin-top: 5px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .line { width: 15px; height: 2px; border-top: 2px dashed; }
+</style>
+</head>
+<body>
+
+<h2>Вертикальные колебания: Модель vs Теория</h2>
+
+<div class="workspace">
+  <canvas id="simCanvas"></canvas>
+  <canvas id="graphCanvas"></canvas>
+</div>
+
+<div class="controls">
+  <div class="slider-group">
+    <label>Масса (m)</label>
+    <input type="range" id="m" min="1" max="20" value="5" step="1">
+    <span id="mVal">5</span>
+  </div>
+  <div class="slider-group">
+    <label>Жёсткость (k)</label>
+    <input type="range" id="k" min="10" max="200" value="50" step="5">
+    <span id="kVal">50</span>
+  </div>
+  <div class="slider-group">
+    <label>Демпфер (c)</label>
+    <input type="range" id="c" min="0.1" max="5" value="1" step="0.1">
+    <span id="cVal">1.0</span>
+  </div>
+  
+  <div class="btn-row">
+    <button id="scanBtn">▶ Сканировать частоту</button>
+    <button id="resetBtn">🔄 Сброс</button>
+  </div>
+  <div class="status" id="status">Нажмите "Сканировать" для снятия показаний</div>
+  
+  <div class="legend">
+    <div class="legend-item"><div class="dot" style="background:#4caf50;"></div> Измерено (модель)</div>
+    <div class="legend-item"><div class="line" style="border-color:#fff;"></div> Аналитика (теория)</div>
+  </div>
+</div>
+
+<script>
+// --- Настройка Canvas ---
+const simCanvas = document.getElementById('simCanvas');
+const simCtx = simCanvas.getContext('2d');
+const graphCanvas = document.getElementById('graphCanvas');
+const graphCtx = graphCanvas.getContext('2d');
+
+function resize() {
+  simCanvas.width = simCanvas.clientWidth;
+  simCanvas.height = simCanvas.clientHeight;
+  graphCanvas.width = graphCanvas.clientWidth;
+  graphCanvas.height = graphCanvas.clientHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// --- Параметры системы ---
+let m = 5, k = 50, c = 1;
+let y = 0, v = 0, t = 0; 
+let forceA = 20; 
+let forceW = 0;  
+
+// --- Данные для АЧХ ---
+let afcPoints = []; 
+let isScanning = false;
+let scanW = 0.5;
+let scanStep = 0.4;
+let measureTime = 0;
+let currentMaxA = 0;
+let isMeasuring = false;
+
+// --- Привязка ползунков ---
+const sliders = ['m', 'k', 'c'];
+sliders.forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => {
+    document.getElementById(id + 'Val').textContent = el.value;
+    m = parseFloat(document.getElementById('m').value);
+    k = parseFloat(document.getElementById('k').value);
+    c = parseFloat(document.getElementById('c').value);
+    resetSim();
+  });
+});
+
+function resetSim() {
+  y = 0; v = 0; t = 0;
+  afcPoints = [];
+  isScanning = false;
+  isMeasuring = false;
+  scanW = 0.5;
+  measureTime = 0;
+  currentMaxA = 0;
+  document.getElementById('status').textContent = 'Система сброшена. Готов к сканированию.';
+}
+
+// --- Физика ---
+function stepPhysics(dt) {
+  const force = forceA * Math.sin(forceW * t);
+  const acc = (force - c * v - k * y) / m;
+  v += acc * dt;
+  y += v * dt;
+  t += dt;
+}
+
+// --- Аналитическая АЧХ (Теория) ---
+function getAnalyticalAmp(w) {
+  const den = Math.sqrt(Math.pow(k - m * w * w, 2) + Math.pow(c * w, 2));
+  return den > 0 ? forceA / den : 0;
+}
+
+// --- Отрисовка физической модели ---
+function drawSim() {
+  const w = simCanvas.width;
+  const h = simCanvas.height;
+  simCtx.clearRect(0, 0, w, h);
+
+  const cx = w / 2;
+  const topY = 40;
+  const eqY = h / 2; 
+  const massY = eqY + y * 1.2; 
+
+  // Опорная поверхность
+  simCtx.fillStyle = '#555';
+  simCtx.fillRect(cx - 60, topY - 10, 120, 10);
+  simCtx.strokeStyle = '#777'; simCtx.lineWidth = 1;
+  for(let i=0; i<12; i++) {
+    simCtx.beginPath();
+    simCtx.moveTo(cx - 55 + i*10, topY - 10);
+    simCtx.lineTo(cx - 65 + i*10, topY - 20);
+    simCtx.stroke();
+  }
+
+  // Пружина
+  simCtx.strokeStyle = '#4caf50'; simCtx.lineWidth = 3;
+  simCtx.beginPath(); simCtx.moveTo(cx, topY);
+  const springLen = massY - 20 - topY;
+  const coils = 8;
+  for(let i=0; i<coils; i++) {
+    const y1 = topY + (springLen / coils) * i;
+    const y2 = topY + (springLen / coils) * (i + 0.5);
+    const y3 = topY + (springLen / coils) * (i + 1);
+    const dir = (i % 2 === 0) ? 1 : -1;
+    simCtx.lineTo(cx + dir * 15, y2);
+    simCtx.lineTo(cx, y3);
+  }
+  simCtx.stroke();
+
+  // Масса
+  simCtx.fillStyle = '#2196f3';
+  simCtx.shadowBlur = 10; simCtx.shadowColor = '#2196f3';
+  simCtx.fillRect(cx - 30, massY - 20, 60, 40);
+  simCtx.shadowBlur = 0;
+  simCtx.strokeStyle = '#fff'; simCtx.lineWidth = 2;
+  simCtx.strokeRect(cx - 30, massY - 20, 60, 40);
+  simCtx.fillStyle = '#fff'; simCtx.font = 'bold 14px sans-serif';
+  simCtx.textAlign = 'center'; simCtx.textBaseline = 'middle';
+  simCtx.fillText('m', cx, massY);
+
+  // Вектор силы
+  const currentForce = forceA * Math.sin(forceW * t);
+  const arrowLen = currentForce * 1.2;
+  simCtx.strokeStyle = '#f44336'; simCtx.fillStyle = '#f44336'; simCtx.lineWidth = 3;
+  simCtx.beginPath();
+  simCtx.moveTo(cx, massY + 25);
+  simCtx.lineTo(cx, massY + 25 + arrowLen);
+  simCtx.stroke();
+  
+  if(Math.abs(arrowLen) > 5) {
+    const tipY = massY + 25 + arrowLen;
+    const dir = arrowLen > 0 ? 1 : -1;
+    simCtx.beginPath();
+    simCtx.moveTo(cx, tipY);
+    simCtx.lineTo(cx - 6, tipY - 8 * dir);
+    simCtx.lineTo(cx + 6, tipY - 8 * dir);
+    simCtx.closePath();
+    simCtx.fill();
+  }
+
+  // Линия равновесия
+  simCtx.strokeStyle = '#666'; simCtx.setLineDash([4, 4]); simCtx.lineWidth = 1;
+  simCtx.beginPath(); simCtx.moveTo(cx - 80, eqY); simCtx.lineTo(cx + 80, eqY); simCtx.stroke();
+  simCtx.setLineDash([]);
+}
+
+// --- Отрисовка графика АЧХ ---
+function drawGraph() {
+  const w = graphCanvas.width;
+  const h = graphCanvas.height;
+  graphCtx.clearRect(0, 0, w, h);
+
+  const margin = { l: 45, r: 15, t: 15, b: 35 };
+  const plotW = w - margin.l - margin.r;
+  const plotH = h - margin.t - margin.b;
+  const maxW = 15;
+
+  // Автомасштаб по амплитуде (с учетом теоретического максимума)
+  let maxA = 1;
+  // Проверим теоретический пик в диапазоне
+  for(let i=0; i<=100; i++) {
+    const testW = (i / 100) * maxW;
+    const testA = getAnalyticalAmp(testW);
+    if(testA > maxA) maxA = testA;
+  }
+  maxA = Math.min(maxA * 1.2, 60); 
+
+  // Оси
+  graphCtx.strokeStyle = '#888'; graphCtx.lineWidth = 1.5;
+  graphCtx.beginPath();
+  graphCtx.moveTo(margin.l, margin.t);
+  graphCtx.lineTo(margin.l, margin.t + plotH);
+  graphCtx.lineTo(margin.l + plotW, margin.t + plotH);
+  graphCtx.stroke();
+
+  // Подписи осей
+  graphCtx.fillStyle = '#aaa'; graphCtx.font = '11px sans-serif';
+  graphCtx.textAlign = 'center';
+  graphCtx.fillText('ω, рад/с', margin.l + plotW / 2, h - 8);
+  graphCtx.save();
+  graphCtx.translate(12, margin.t + plotH / 2);
+  graphCtx.rotate(-Math.PI / 2);
+  graphCtx.fillText('Амплитуда A', 0, 0);
+  graphCtx.restore();
+
+  // Сетка и деления Y
+  graphCtx.strokeStyle = '#333'; graphCtx.lineWidth = 1;
+  graphCtx.beginPath();
+  for(let i=0; i<=5; i++) {
+    const ay = (i / 5) * maxA;
+    const py = margin.t + plotH - (ay / maxA) * plotH;
+    graphCtx.moveTo(margin.l, py);
+    graphCtx.lineTo(margin.l + plotW, py);
+    graphCtx.fillStyle = '#888'; graphCtx.textAlign = 'right';
+    graphCtx.fillText(ay.toFixed(1), margin.l - 5, py + 3);
+  }
+  graphCtx.stroke();
+
+  // Деления X (Частота)
+  graphCtx.beginPath();
+  for(let i=0; i<=5; i++) {
+    const wx = (i / 5) * maxW;
+    const px = margin.l + (i / 5) * plotW;
+    graphCtx.moveTo(px, margin.t + plotH);
+    graphCtx.lineTo(px, margin.t + plotH + 5);
+    graphCtx.fillStyle = '#888'; graphCtx.textAlign = 'center';
+    graphCtx.fillText(wx.toFixed(1), px, margin.t + plotH + 18);
+  }
+  graphCtx.stroke();
+
+  // 1. Рисуем АНАЛИТИЧЕСКУЮ кривую (Теория)
+  graphCtx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+  graphCtx.lineWidth = 2;
+  graphCtx.setLineDash([6, 4]);
+  graphCtx.beginPath();
+  for (let i = 0; i <= plotW; i++) {
+    const w_val = (i / plotW) * maxW;
+    const a_val = getAnalyticalAmp(w_val);
+    const px = margin.l + i;
+    const py = margin.t + plotH - (a_val / maxA) * plotH;
+    if (i === 0) graphCtx.moveTo(px, py);
+    else graphCtx.lineTo(px, py);
+  }
+  graphCtx.stroke();
+  graphCtx.setLineDash([]);
+
+  // 2. Рисуем ТОЧКИ моделирования (Практика)
+  graphCtx.fillStyle = '#4caf50';
+  afcPoints.forEach(p => {
+    const px = margin.l + (p.w / maxW) * plotW;
+    const py = margin.t + plotH - (p.a / maxA) * plotH;
+    graphCtx.beginPath();
+    graphCtx.arc(px, py, 4, 0, Math.PI * 2);
+    graphCtx.fill();
+  });
+  
+  // Текущая измеряемая точка (мигающая)
+  if (isMeasuring) {
+    const px = margin.l + (scanW / maxW) * plotW;
+    const py = margin.t + plotH - (currentMaxA / maxA) * plotH;
+    graphCtx.fillStyle = '#fff';
+    graphCtx.beginPath();
+    graphCtx.arc(px, py, 5, 0, Math.PI * 2);
+    graphCtx.fill();
+  }
+}
+
+// --- Главный цикл ---
+let lastTime = performance.now();
+
+function loop(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+
+  if (isScanning) {
+    forceW = scanW;
+    stepPhysics(dt);
+    
+    // Измеряем максимальную амплитуду за период
+    if (Math.abs(y) > currentMaxA) currentMaxA = Math.abs(y);
+    measureTime += dt;
+    
+    // Ждем примерно 1.5 периода текущей частоты для установления и замера
+    const period = (scanW > 0.1) ? (2 * Math.PI / scanW) : 10;
+    if (measureTime > period * 1.5) {
+      afcPoints.push({ w: scanW, a: currentMaxA });
+      scanW += scanStep;
+      measureTime = 0;
+      currentMaxA = 0;
+      y = 0; v = 0; // Сброс состояния для чистоты эксперимента на новой частоте
+      
+      if (scanW > 15) {
+        isScanning = false;
+        document.getElementById('status').textContent = 'Сканирование завершено. Модель совпадает с теорией!';
+      } else {
+        document.getElementById('status').textContent = `Измерение при ω = ${scanW.toFixed(1)} рад/с...`;
+      }
+    }
+  } else {
+    stepPhysics(dt);
+  }
+
+  drawSim();
+  drawGraph();
+  requestAnimationFrame(loop);
+}
+
+// --- Обработчики кнопок ---
+document.getElementById('scanBtn').addEventListener('click', () => {
+  if (isScanning) return;
+  resetSim();
+  isScanning = true;
+  document.getElementById('status').textContent = 'Начало сканирования...';
+});
+
+document.getElementById('resetBtn').addEventListener('click', resetSim);
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
