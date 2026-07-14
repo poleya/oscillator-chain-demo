@@ -15,6 +15,7 @@
 
 | Файл | Описание | Спецификация |
 |------|----------|--------------|
+| [`2dof-horizontal-chain-kinematic-afc-scan.html`](2dof-horizontal-chain-kinematic-afc-scan.html) | Линейная система с 2 степенями свободы. Кинематическое возбуждение опоры (перемещение). АЧХ, коэффициент передачи \|y₂/y₁\|. | [`SPEC_verification_2DOF_kinematic.md`](SPEC_verification_2DOF_kinematic.md) |
 | [`2dof-horizontal-chain-afc-scan.html`](2dof-horizontal-chain-afc-scan.html) | Линейная система с 2 степенями свободы. Горизонтальная цепь с вертикальными колебаниями масс. Матрица динамической податливости, коэффициент передачи(межпарциальной связи)\|y₂/y₁\|. | [`SPEC_verification_2DOF_horizontal.md`](verification/SPEC_verification_2DOF_horizontal.md) |
 | [`1dof-vertical-afc-scan.html`](1dof-vertical-afc-scan.html) | Линейная система с 1 степенью свободы. Вертикальные колебания массы на пружине с демпфером. Базовая верификация алгоритма частотного сканирования. | [`SPEC_verification_1DOF_vertical.md`](SPEC_verification_1DOF_vertical.md) |
 | [`2dof-horizontal-chain-afc-scan.html`](2dof-horizontal-chain-afc-scan.html) | Линейная система с 2 степенями свободы. Горизонтальная цепь с вертикальными колебаниями масс. Верификация матрицы динамической податливости, теоремы взаимности Максвелла и коэффициента передачи $\|y_2/y_1\|$. | [`SPEC_verification_2DOF_horizontal.md`](SPEC_verification_2DOF_horizontal.md) |
