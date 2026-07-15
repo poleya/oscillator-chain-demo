@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Маятник</title>
+<style>
+body { background: #1a1a1a; color: #e0e0e0; font-family: Arial; margin: 0; padding: 10px; }
+h2 { color: #4caf50; font-size: 18px; margin: 10px 0; border-bottom: 1px solid #444; padding-bottom: 5px; }
+canvas { background: #222; border: 1px solid #444; display: block; width: 100%; height: 180px; margin: 10px 0; }
+.controls { background: #252525; padding: 10px; margin: 10px 0; }
+label { display: block; margin: 10px 0; color: #ccc; }
+input[type="range"] { width: 100%; }
+button { background: #4caf50; color: white; border: none; padding: 10px; margin: 5px; border-radius: 5px; font-size: 14px; }
+button:active { background: #388e3c; }
+#flipBtn { background: #2196f3; }
+#status { text-align: center; padding: 10px; margin: 10px 0; border-radius: 5px; font-weight: bold; }
+.stable { background: rgba(76, 175, 80, 0.2); color: #4caf50; border: 1px solid #4caf50; }
+.unstable { background: rgba(244, 67, 54, 0.2); color: #f44336; border: 1px solid #f44336; }
+.footer { text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px solid #444; font-size: 12px; color: #888; }
+.footer strong { color: #4caf50; display: block; margin-bottom: 5px; }
+.footer .email { color: #2196f3; margin-top: 8px; }
+
+.logo-container { text-align: center; margin: 20px 0; }
+.logo-title { color: #fff; font-size: 20px; margin-bottom: 10px; font-weight: normal; }
+.logo-subtitle { color: #888; font-size: 16px; margin-top: 10px; font-style: italic; }
+
+#helpBtn {
+  position: fixed;
+  top: 15px;
+  right: 15px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #2196f3;
+  color: white;
+  font-size: 20px;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+  z-index: 100;
+}
+
+#modal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.8);
+  z-index: 200;
+  overflow-y: auto;
+  padding: 20px;
+}
+#modal.open { display: block; }
+.modal-content {
+  background: #252525;
+  max-width: 500px;
+  margin: 40px auto;
+  padding: 20px;
+  border-radius: 10px;
+}
+.modal-content h3 { color: #4caf50; margin-bottom: 15px; }
+.modal-content p { color: #ccc; line-height: 1.6; margin-bottom: 10px; }
+.modal-content .credits { 
+  background: #1a1a1a; 
+  padding: 12px; 
+  border-radius: 5px; 
+  margin: 15px 0;
+}
+.modal-content .credits strong { color: #4caf50; }
+.modal-content .credits .ai-note { 
+  color: #888; 
+  font-size: 11px; 
+  margin-top: 8px; 
+  font-style: italic;
+}
+#closeModal { background: #f44336; margin-top: 15px; }
+
+/* Простая матрица */
+.matrix { 
+  background: #2a2a2a; 
+  padding: 10px; 
+  margin: 10px 0;
+  border: 1px solid #444;
+}
+.matrix table { 
+  width: 100%; 
+  border-collapse: collapse; 
+  margin-top: 10px;
+}
+.matrix td { 
+  border: 1px solid #555; 
+  padding: 8px; 
+  text-align: center; 
+  font-family: monospace; 
+  font-size: 12px;
+}
+</style>
+</head>
+<body>
+
+<button id="helpBtn">?</button>
+
+<div id="modal">
+  <div class="modal-content">
+    <h3>О проекте</h3>
+    <p><strong>Механика вибраций в примерах</strong> — интерактивная демонстрация вибрационных эффектов.</p>
+    <p>Данный пример показывает <strong>маятник Капицы</strong> — стабилизация перевёрнутого маятника вибрацией подвеса.</p>
+    
+    <div class="credits">
+      <p style="margin:0"><strong>Научная основа:</strong></p>
+      <p style="margin:5px 0 0 0">• Метод разделения движений — <strong>И. И. Блехман</strong></p>
+      <p style="margin:5px 0 0 0">• Структурные матрицы — <strong>Л. Г. Шатихин</strong></p>
+      <p class="ai-note">Интеллектуальная поддержка: AI-ассистент (Qwen, Alibaba Cloud).</p>
+    </div>
+
+    <p><strong>Как пользоваться:</strong></p>
+    <p>• Установите угол близким к 3.14<br>
+    • Нажмите "Перевернуть"<br>
+    • Увеличивайте амплитуду<br>
+    • При a²ω²/(2gl) > 1 маятник стабилизируется</p>
+    
+    <button id="closeModal">Закрыть</button>
+  </div>
+</div>
+
+<div class="logo-container">
+  <div class="logo-title">механика вибраций</div>
+  <svg width="240" height="100" viewBox="0 0 240 100">
+    <path d="M 20 30 Q 40 10, 60 30 Q 80 50, 100 30 Q 120 10, 140 30 Q 160 50, 180 30 Q 200 10, 220 30" stroke="#2196f3" stroke-width="3" fill="none"/>
+    <path d="M 20 70 Q 40 50, 60 70 Q 80 90, 100 70 Q 120 50, 140 70 Q 160 90, 180 70 Q 200 50, 220 70" stroke="#4caf50" stroke-width="3" fill="none"/>
+    <circle cx="120" cy="50" r="8" fill="#ff0000"/>
+  </svg>
+  <div class="logo-subtitle">в примерах</div>
+</div>
+
+<h2>Маятник Капицы</h2>
+
+<canvas id="simCanvas"></canvas>
+<canvas id="graphCanvas"></canvas>
+
+<div class="controls">
+<label>Амплитуда: <input type="range" id="amp" min="0" max="0.5" step="0.01" value="0"></label>
+<label>Частота: <input type="range" id="freq" min="5" max="20" step="0.5" value="10"></label>
+<label>Угол: <input type="range" id="theta" min="0" max="3.14" step="0.1" value="0.1"></label>
+<button onclick="toggle()">Старт</button>
+<button onclick="flip()">🔄 Перевернуть</button>
+<button onclick="reset()">Сброс</button>
+
+<div class="matrix">
+  <div style="text-align:center; color:#ccc; font-size:12px;">СТРУКТУРНАЯ МАТРИЦА</div>
+  <table>
+    <tr>
+      <td style="background:#333; color:#888;">X</td>
+      <td style="background:#333; color:#888;">sin(X)</td>
+      <td style="background:#333; color:#888;">sin(2X)</td>
+    </tr>
+    <tr>
+      <td style="background:#2196f3; color:white;">p²</td>
+      <td id="cell1" style="background:#f44336; color:white;">-g/l</td>
+      <td id="cell2" style="background:#555; color:#ccc;">0.00</td>
+    </tr>
+  </table>
+</div>
+</div>
+
+<div id="status" class="unstable">⚠️ Неустойчиво (верхнее положение)</div>
+
+<div class="footer">
+<strong>Разработчик: Елисеев Андрей Владимирович</strong>
+© 2026 All rights reserved
+<div class="email">Замечания, вопросы, предложения: eavsh@ya.ru</div>
+</div>
+
+<script>
+var simCanvas = document.getElementById('simCanvas');
+var graphCanvas = document.getElementById('graphCanvas');
+var simCtx = simCanvas.getContext('2d');
+var graphCtx = graphCanvas.getContext('2d');
+
+simCanvas.width = window.innerWidth - 40;
+simCanvas.height = 180;
+graphCanvas.width = window.innerWidth - 40;
+graphCanvas.height = 180;
+
+var g = 9.81, l = 1.0, b = 0.1;
+var theta = 0.1, omega = 0, time = 0;
+var running = false;
+var amp = 0, freq = 10;
+
+document.getElementById('amp').oninput = function() { amp = parseFloat(this.value); if(!running) { draw(); updateStatus(); updateMatrix(); } };
+document.getElementById('freq').oninput = function() { freq = parseFloat(this.value); if(!running) { draw(); updateStatus(); updateMatrix(); } };
+document.getElementById('theta').oninput = function() { theta = parseFloat(this.value); if(!running) { draw(); updateStatus(); } };
+
+function toggle() { running = !running; if(running) loop(); }
+function flip() { theta = Math.PI - theta; draw(); updateStatus(); }
+function reset() { running = false; theta = parseFloat(document.getElementById('theta').value); omega = 0; time = 0; draw(); updateStatus(); updateMatrix(); }
+
+function step(dt) {
+  var w = freq * Math.sqrt(g/l);
+  var accel = -(g/l - amp*w*w*Math.cos(w*time)/l)*Math.sin(theta) - b*omega;
+  omega += accel * dt;
+  theta += omega * dt;
+  time += dt;
+}
+
+function loop() {
+  if(!running) return;
+  step(0.016);
+  draw();
+  updateStatus();
+  setTimeout(loop, 16);
+}
+
+function draw() {
+  var W = simCanvas.width, H = simCanvas.height;
+  simCtx.clearRect(0, 0, W, H);
+  var cx = W/2, cy = 60, len = 60;
+  var vibY = amp * 20 * Math.cos(freq * Math.sqrt(g/l) * time);
+  simCtx.fillStyle = '#34495e';
+  simCtx.fillRect(cx - 40, cy + vibY - 8, 80, 16);
+  var x = cx + len * Math.sin(theta);
+  var y = cy + vibY + len * Math.cos(theta);
+  simCtx.strokeStyle = '#000';
+  simCtx.lineWidth = 4;
+  simCtx.beginPath();
+  simCtx.moveTo(cx, cy + vibY);
+  simCtx.lineTo(x, y);
+  simCtx.stroke();
+  simCtx.fillStyle = '#ff0000';
+  simCtx.beginPath();
+  simCtx.arc(x, y, 12, 0, 2*Math.PI);
+  simCtx.fill();
+
+  var W2 = graphCanvas.width, H2 = graphCanvas.height;
+  graphCtx.clearRect(0, 0, W2, H2);
+  
+  var ratio = (amp*amp * freq*freq) / 2;
+  var padX = 35;
+  var padTop = 25;
+  var padBottom = 45;
+  var gW = W2 - 2*padX;
+  var gH = H2 - padTop - padBottom;
+  
+  var minV = Infinity, maxV = -Infinity;
+  for(var i=0; i<=gW; i+=2) {
+    var t = (i/gW)*2*Math.PI;
+    var V = -Math.cos(t) - (ratio/4)*Math.cos(2*t);
+    if(V<minV) minV=V; if(V>maxV) maxV=V;
+  }
+  var range = maxV-minV || 1;
+  var minY = minV - 0.15*range, maxY = maxV + 0.15*range;
+  
+  graphCtx.fillStyle = '#ccc';
+  graphCtx.font = 'bold 12px Arial';
+  graphCtx.textAlign = 'center';
+  graphCtx.fillText('Эффективный потенциал', W2 / 2, 15);
+  
+  graphCtx.strokeStyle = '#666';
+  graphCtx.lineWidth = 2;
+  graphCtx.beginPath();
+  graphCtx.moveTo(padX, padTop);
+  graphCtx.lineTo(padX, H2 - padBottom);
+  graphCtx.lineTo(W2 - padX, H2 - padBottom);
+  graphCtx.stroke();
+  
+  graphCtx.save();
+  graphCtx.translate(12, H2 / 2);
+  graphCtx.rotate(-Math.PI / 2);
+  graphCtx.fillStyle = '#888';
+  graphCtx.font = '12px Arial';
+  graphCtx.textAlign = 'center';
+  graphCtx.fillText('V_eff', 0, 0);
+  graphCtx.restore();
+  
+  graphCtx.fillStyle = '#888';
+  graphCtx.font = '12px Arial';
+  graphCtx.textAlign = 'center';
+  graphCtx.fillText('θ', W2 - padX + 15, H2 - padBottom + 4);
+
+  graphCtx.fillStyle = '#888';
+  graphCtx.font = '11px Arial';
+  graphCtx.textAlign = 'center';
+  graphCtx.textBaseline = 'top';
+  
+  var ticks = [
+    { val: 0, label: '0' },
+    { val: 0.25, label: 'π/2' },
+    { val: 0.5, label: 'π' },
+    { val: 0.75, label: '3π/2' },
+    { val: 1.0, label: '2π' }
+  ];
+  
+  for(var i = 0; i < ticks.length; i++) {
+    var xPos = padX + ticks[i].val * gW;
+    graphCtx.beginPath();
+    graphCtx.moveTo(xPos, H2 - padBottom);
+    graphCtx.lineTo(xPos, H2 - padBottom + 5);
+    graphCtx.stroke();
+    graphCtx.fillText(ticks[i].label, xPos, H2 - padBottom + 8);
+  }
+  
+  graphCtx.strokeStyle = '#3498db';
+  graphCtx.lineWidth = 3;
+  graphCtx.beginPath();
+  for(var i=0; i<=gW; i++) {
+    var t = (i/gW)*2*Math.PI;
+    var V = -Math.cos(t) - (ratio/4)*Math.cos(2*t);
+    var py = (H2 - padBottom) - ((V-minY)/(maxY-minY))*gH;
+    if(i===0) graphCtx.moveTo(padX+i, py);
+    else graphCtx.lineTo(padX+i, py);
+  }
+  graphCtx.stroke();
+  
+  var normTheta = ((theta % (2*Math.PI)) + 2*Math.PI) % (2*Math.PI);
+  var currentV = -Math.cos(theta) - (ratio/4)*Math.cos(2*theta);
+  var normalizedCurrentV = (currentV - minY) / (maxY - minY);
+  var currentX = padX + (normTheta / (2*Math.PI)) * gW;
+  var currentY = (H2 - padBottom) - normalizedCurrentV * gH;
+  
+  graphCtx.fillStyle = '#ff0000';
+  graphCtx.beginPath();
+  graphCtx.arc(currentX, currentY, 6, 0, 2*Math.PI);
+  graphCtx.fill();
+}
+
+function updateStatus() {
+  var ratio = (amp*amp * freq*freq) / 2;
+  var isUp = Math.abs(Math.abs(theta) - Math.PI) < 0.5;
+  var status = document.getElementById('status');
+  if(isUp && ratio > 1) {
+    status.className = 'stable';
+    status.innerHTML = '✅ УСТОЙЧИВО! Вибрация удерживает маятник вверх ногами!';
+  } else if(isUp) {
+    status.className = 'unstable';
+    status.innerHTML = '️ Неустойчиво (маятник упадёт)';
+  } else {
+    status.className = 'stable';
+    status.innerHTML = '✅ Устойчиво (нижнее положение)';
+  }
+}
+
+function updateMatrix() {
+  var ratio = (amp*amp * freq*freq) / 2;
+  var c1 = document.getElementById('cell1');
+  var c2 = document.getElementById('cell2');
+  
+  c2.innerText = (ratio/4).toFixed(2);
+  
+  if(ratio > 1) {
+    c1.style.background = '#4caf50';
+    c2.style.background = '#4caf50';
+  } else {
+    c1.style.background = '#f44336';
+    c2.style.background = '#555';
+  }
+}
+
+document.getElementById('helpBtn').onclick = function() { document.getElementById('modal').classList.add('open'); };
+document.getElementById('closeModal').onclick = function() { document.getElementById('modal').classList.remove('open'); };
+
+draw();
+updateStatus();
+updateMatrix();
+</script>
+</body>
+</html>
