@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>АЧХ: 3-DOF полная структурная сеть</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+/* SPLASH SCREEN */
+#splash{
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  background:#0a0a0a;
+  z-index:99999;
+  display:flex;flex-direction:column;
+  justify-content:center;align-items:center;
+}
+.splash-logo{margin-bottom:20px}
+.splash-title{color:#fff;font-size:20px;letter-spacing:3px;text-transform:uppercase}
+.splash-subtitle{color:#888;font-size:13px;margin-top:8px;font-style:italic}
+
+body{background:#1a1a1a;color:#e0e0e0;font-family:sans-serif;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+header{display:flex;justify-content:space-between;align-items:center;padding:10px;background:#252525;border-bottom:1px solid #444;z-index:5}
+header h2{font-size:13px;color:#fff}
+#toggleSettings{background:#4caf50;color:#fff;border:none;border-radius:4px;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:bold}
+#toggleSettings:active{background:#388e3c}
+
+#modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:200;overflow-y:auto;padding:20px}
+#modal.open{display:block}
+.modal-content{background:#252525;max-width:600px;margin:40px auto;padding:25px;border-radius:10px;border:1px solid #444}
+.modal-content h3{color:#4caf50;margin-bottom:15px;font-size:18px}
+.modal-content h4{color:#2196f3;margin:15px 0 10px 0;font-size:14px}
+.modal-content p{color:#ccc;line-height:1.6;margin-bottom:10px;font-size:13px}
+.modal-content ul{color:#ccc;line-height:1.8;margin:10px 0;padding-left:20px}
+.modal-content .credits{background:#1e1e1e;padding:12px;border-radius:5px;margin:15px 0;border-left:3px solid #4caf50}
+.modal-content .credits strong{color:#4caf50}
+.modal-content .ai-note{color:#888;font-size:11px;margin-top:8px;font-style:italic}
+#closeModal{background:#f44336;margin-top:15px;padding:12px}
+
+#exportModal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:200;overflow-y:auto;padding:20px}
+#exportModal.open{display:block}
+.export-content{background:#252525;max-width:600px;margin:40px auto;padding:25px;border-radius:10px;border:1px solid #444}
+.export-content h3{color:#4caf50;margin-bottom:15px}
+.export-content textarea{width:100%;height:300px;background:#1a1a1a;color:#e0e0e0;border:1px solid #444;border-radius:5px;padding:10px;font-family:monospace;font-size:11px;resize:vertical}
+.export-content .btn-row{margin-top:15px;display:flex;gap:10px}
+#copyBtn{background:#2196f3}
+#closeExportBtn{background:#f44336}
+
+.workspace{display:flex;flex:1;flex-direction:row}
+@media(max-width:600px){.workspace{flex-direction:column}}
+canvas{background:#222;display:block}
+#simCanvas{flex:1;border-right:1px solid #444}
+#graphCanvas{flex:1}
+
+#settingsPanel{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,20,20,0.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);z-index:100;display:none;overflow-y:auto;padding:60px 15px 20px}
+#settingsPanel.open{display:block}
+#closeSettings{position:fixed;top:10px;right:15px;z-index:101;background:#f44336;color:#fff;border:none;border-radius:50%;width:40px;height:40px;font-size:20px;cursor:pointer}
+#helpBtn{position:fixed;top:10px;right:65px;z-index:101;background:#2196f3;color:#fff;border:none;border-radius:50%;width:40px;height:40px;font-size:20px;cursor:pointer}
+#closeSettings:active{background:#d32f2f}
+#helpBtn:active{background:#1976d2}
+
+.section-title{color:#4caf50;font-size:12px;font-weight:bold;margin:15px 0 8px;padding-bottom:4px;border-bottom:1px solid #444}
+.sg{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.sg label{font-size:10px;width:100px;color:#ccc}
+.sg input{flex:1;margin:0 6px;accent-color:#4caf50}
+.sg span{font-size:10px;color:#4caf50;font-weight:bold;width:35px;text-align:right}
+.sg select{flex:1;background:#333;color:#fff;border:1px solid #555;border-radius:4px;padding:4px;font-size:11px}
+
+.controls{background:#252525;padding:10px;border-top:1px solid #444;display:flex;flex-direction:column;gap:6px}
+.btn-row{display:flex;gap:8px}
+button{flex:1;padding:10px;border:none;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer;color:white}
+#scanBtn{background:#4caf50}
+#resetBtn{background:#f44336}
+#exportBtn{background:#2196f3}
+.status{text-align:center;font-size:11px;color:#aaa;margin-top:4px}
+.legend{display:flex;justify-content:center;gap:8px;font-size:10px;color:#ccc;margin-top:4px;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:3px}
+.dot{width:8px;height:8px;border-radius:50%}
+.line{width:12px;height:0;border-top:2px dashed}
+
+.matrix-section{background:#1e1e1e;padding:12px;border-radius:6px;margin-top:15px;border:1px solid #333}
+.matrix-title{text-align:center;color:#4caf50;font-size:11px;font-weight:bold;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
+.matrix-subtitle{text-align:center;color:#888;font-size:9px;margin-bottom:10px}
+.matrix-table{width:100%;border-collapse:collapse;margin:0 auto;max-width:380px}
+.matrix-table th,.matrix-table td{border:1px solid #444;padding:6px 4px;text-align:center;font-size:10px;font-family:monospace}
+.matrix-table th{background:#333;color:#888;font-size:9px;font-weight:normal}
+.matrix-table .diag{background:#2196f3;color:#fff;font-weight:bold}
+.matrix-table .link{background:#4caf50;color:#fff}
+.matrix-table .zero{background:#3a3a3a;color:#666}
+.matrix-table .force{background:#f44336;color:#fff}
+.matrix-table .label{font-size:8px;opacity:0.8;display:block;margin-top:2px}
+.matrix-table .value{font-size:11px;font-weight:bold}
+.matrix-note{text-align:center;font-size:9px;color:#888;margin-top:8px;font-style:italic}
+
+.dev-block{background:#1e1e1e;padding:12px;border-radius:6px;margin-top:15px;border-left:3px solid #4caf50}
+.dev-block h4{color:#4caf50;font-size:11px;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px}
+.dev-row{font-size:10px;color:#ccc;margin-bottom:4px;line-height:1.4}
+.dev-row strong{color:#fff}
+.dev-row .highlight{color:#4caf50}
+.dev-row .ai-note{color:#888;font-style:italic;font-size:9px}
+.dev-footer{margin-top:8px;padding-top:8px;border-top:1px solid #333;font-size:9px;color:#666;text-align:center}
+.dev-author{color:#fff;font-weight:bold;margin-bottom:5px}
+.dev-email{color:#2196f3;margin-top:4px}
+</style>
+</head>
+<body>
+
+<!-- SPLASH SCREEN -->
+<div id="splash">
+  <svg class="splash-logo" width="120" height="80" viewBox="0 0 240 100">
+    <path d="M 20 30 Q 40 10, 60 30 Q 80 50, 100 30 Q 120 10, 140 30 Q 160 50, 180 30 Q 200 10, 220 30" stroke="#2196f3" stroke-width="4" fill="none"/>
+    <path d="M 20 70 Q 40 50, 60 70 Q 80 90, 100 70 Q 120 50, 140 70 Q 160 90, 180 70 Q 200 50, 220 70" stroke="#4caf50" stroke-width="4" fill="none"/>
+    <circle cx="120" cy="50" r="10" fill="#ff0000"/>
+  </svg>
+  <div class="splash-title">механика вибраций</div>
+  <div class="splash-subtitle">в примерах</div>
+</div>
+
+<header>
+<h2>3-DOF: Полная структурная сеть</h2>
+<button id="toggleSettings">⚙ Настройки</button>
+</header>
+
+<!-- МОДАЛЬНОЕ ОКНО ХЕЛП -->
+<div id="modal">
+  <div class="modal-content">
+    <h3>📖 О проекте</h3>
+    
+    <h4>Разработчик</h4>
+    <p><strong style="color:#4caf50;font-size:16px">Елисеев Андрей Владимирович</strong></p>
+    <p style="font-size:11px;color:#888">Докторант, направление: методы структурного математического моделирования механических колебательных систем</p>
+    
+    <h4>Назначение</h4>
+    <p>Интерактивная демонстрация динамических характеристик механических систем с тремя степенями свободы с применением структурных матриц (Л. Г. Шатихин).</p>
+    
+    <h4>Возможности</h4>
+    <ul>
+      <li>Визуализация динамической податливости системы (амплитудно-частотные характеристики)</li>
+      <li>Анализ рычажных связей между массами (передаточные функции)</li>
+      <li>Интерактивное изменение параметров системы (массы, жёсткости, демпфирование)</li>
+      <li>Отображение структурной матрицы системы в операторной форме</li>
+      <li>Частотное сканирование с автоматическим определением резонансов</li>
+      <li><b>Экспорт данных</b> для независимой экспертизы и верификации</li>
+    </ul>
+    
+    <h4>Экспорт данных (для экспертизы)</h4>
+    <p>Нажмите кнопку <b>💾 Экспорт</b> в панели управления. Данные будут показаны в специальном окне с возможностью копирования в формате JSON. Файл содержит:</p>
+    <ul>
+      <li><b>Паспорт системы:</b> точные значения всех масс, жесткостей и коэффициентов демпфирования</li>
+      <li><b>Структурная матрица:</b> операторное представление системы (диагональные элементы Q и связи R)</li>
+      <li><b>Теоретическая АЧХ:</b> массив точек, рассчитанный аналитически через обратную матрицу импеданса</li>
+      <li><b>Экспериментальная АЧХ:</b> массив точек, полученных в результате "сканирования"</li>
+    </ul>
+    <p style="font-size:11px;color:#888">Эти данные можно импортировать в MATLAB, Python или MathCAD для независимой проверки корректности расчетов.</p>
+
+    <h4>Как пользоваться</h4>
+    <ul>
+      <li>Настройте параметры системы через панель "Настройки" (кнопка ⚙)</li>
+      <li>Выберите точку приложения гармонической силы (m₁, m₂ или m₃)</li>
+      <li>Выберите режим отображения: динамическая податливость или рычажные связи</li>
+      <li>Нажмите "▶ Сканировать" для построения АЧХ</li>
+      <li>Используйте "💾 Экспорт" для сохранения результатов</li>
+    </ul>
+    
+    <div class="credits">
+      <p><strong>Научная основа:</strong></p>
+      <p>• Структурные матрицы — <strong>Л. Г. Шатихин</strong></p>
+      <p class="ai-note">Интеллектуальная поддержка: AI-ассистент Qwen (Alibaba Cloud)</p>
+    </div>
+    
+    <p style="font-size:11px;color:#888;margin-top:15px">📧 Контакты: eavsh@ya.ru</p>
+    
+    <button id="closeModal">Закрыть</button>
+  </div>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО ЭКСПОРТА -->
+<div id="exportModal">
+  <div class="export-content">
+    <h3>💾 Экспорт данных</h3>
+    <p style="color:#ccc;margin-bottom:10px">Скопируйте данные ниже и сохраните в файл с расширением .json</p>
+    <textarea id="exportData" readonly></textarea>
+    <div class="btn-row">
+      <button id="copyBtn">📋 Копировать</button>
+      <button id="closeExportBtn">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<div class="workspace">
+<canvas id="simCanvas"></canvas>
+<canvas id="graphCanvas"></canvas>
+</div>
+
+<div id="settingsPanel">
+<button id="closeSettings">✕</button>
+<button id="helpBtn">?</button>
+
+<div class="section-title">⚖ МАССЫ</div>
+<div class="sg"><label>m₁</label><input type="range" id="m1" min="1" max="20" value="5" step="1"><span id="m1Val">5</span></div>
+<div class="sg"><label>m₂</label><input type="range" id="m2" min="1" max="20" value="5" step="1"><span id="m2Val">5</span></div>
+<div class="sg"><label>m₃</label><input type="range" id="m3" min="1" max="20" value="5" step="1"><span id="m3Val">5</span></div>
+
+<div class="section-title"> СВЯЗИ С ОПОРЫ A</div>
+<div class="sg"><label>k_A1 (A→m₁)</label><input type="range" id="kA1" min="0" max="200" value="50" step="5"><span id="kA1Val">50</span></div>
+<div class="sg"><label>c_A1 (A→m₁)</label><input type="range" id="cA1" min="0" max="5" value="1" step="0.1"><span id="cA1Val">1.0</span></div>
+<div class="sg"><label>k_A2 (A→m₂)</label><input type="range" id="kA2" min="0" max="200" value="0" step="5"><span id="kA2Val">0</span></div>
+<div class="sg"><label>c_A2 (A→m₂)</label><input type="range" id="cA2" min="0" max="5" value="0" step="0.1"><span id="cA2Val">0</span></div>
+<div class="sg"><label>k_A3 (A→m)</label><input type="range" id="kA3" min="0" max="200" value="0" step="5"><span id="kA3Val">0</span></div>
+<div class="sg"><label>c_A3 (A→m₃)</label><input type="range" id="cA3" min="0" max="5" value="0" step="0.1"><span id="cA3Val">0</span></div>
+
+<div class="section-title">🔗 СВЯЗИ С ОПОРЫ B</div>
+<div class="sg"><label>k_B1 (B→m₁)</label><input type="range" id="kB1" min="0" max="200" value="0" step="5"><span id="kB1Val">0</span></div>
+<div class="sg"><label>c_B1 (B→m₁)</label><input type="range" id="cB1" min="0" max="5" value="0" step="0.1"><span id="cB1Val">0</span></div>
+<div class="sg"><label>k_B2 (B→m₂)</label><input type="range" id="kB2" min="0" max="200" value="0" step="5"><span id="kB2Val">0</span></div>
+<div class="sg"><label>c_B2 (B→m₂)</label><input type="range" id="cB2" min="0" max="5" value="0" step="0.1"><span id="cB2Val">0</span></div>
+<div class="sg"><label>k_B3 (B→m₃)</label><input type="range" id="kB3" min="0" max="200" value="50" step="5"><span id="kB3Val">50</span></div>
+<div class="sg"><label>c_B3 (B→m₃)</label><input type="range" id="cB3" min="0" max="5" value="1" step="0.1"><span id="cB3Val">1.0</span></div>
+
+<div class="section-title">🔗 МЕЖМАССОВЫЕ СВЯЗИ</div>
+<div class="sg"><label>k₁₂ (m₁→m₂)</label><input type="range" id="k12" min="0" max="100" value="20" step="5"><span id="k12Val">20</span></div>
+<div class="sg"><label>c₁₂ (m₁→m₂)</label><input type="range" id="c12" min="0" max="5" value="0" step="0.1"><span id="c12Val">0</span></div>
+<div class="sg"><label>k₂₃ (m₂→m₃)</label><input type="range" id="k23" min="0" max="100" value="20" step="5"><span id="k23Val">20</span></div>
+<div class="sg"><label>c₂₃ (m₂→m₃)</label><input type="range" id="c23" min="0" max="5" value="0" step="0.1"><span id="c23Val">0</span></div>
+<div class="sg"><label>k₁₃ (m₁→m₃)</label><input type="range" id="k13" min="0" max="100" value="0" step="5"><span id="k13Val">0</span></div>
+<div class="sg"><label>c₁₃ (m₁→m₃)</label><input type="range" id="c13" min="0" max="5" value="0" step="0.1"><span id="c13Val">0</span></div>
+
+<div class="section-title"> ВОЗБУЖДЕНИЕ И АНАЛИЗ</div>
+<div class="sg"><label>Сила F₀</label><input type="range" id="F0" min="1" max="50" value="20" step="1"><span id="F0Val">20</span></div>
+<div class="sg"><label>Установление (T)</label><input type="range" id="settleT" min="1" max="20" value="5" step="1"><span id="settleTVal">5</span></div>
+<div class="sg"><label>Сила на массе:</label>
+<select id="forceOn">
+<option value="1">m₁</option>
+<option value="2">m₂</option>
+<option value="3">m₃</option>
+</select>
+</div>
+<div class="sg"><label>Режим графика:</label>
+<select id="viewMode">
+<option value="amps">Динамическая податливость y₁, y₂, y₃</option>
+<option value="trans_21">Рычажная связь |y₂/y₁|</option>
+<option value="trans_32">Рычажная связь |y/y₂|</option>
+<option value="trans_31">Рычажная связь |y/y₁|</option>
+</select>
+</div>
+
+<!-- СТРУКТУРНАЯ МАТРИЦА -->
+<div class="matrix-section">
+<div class="matrix-title"> Структурная матрица системы</div>
+<div class="matrix-subtitle">Метод Л. Г. Шатихина (операторное представление)</div>
+<table class="matrix-table">
+<thead>
+<tr><th></th><th>y₁</th><th>y₂</th><th>y₃</th><th>F(t)</th></tr>
+</thead>
+<tbody>
+<tr>
+<th>y₁</th>
+<td class="diag"><span class="value" id="Q11">70</span><span class="label">Q₁₁</span></td>
+<td class="zero"><span class="value" id="R12">0</span><span class="label">R₁₂</span></td>
+<td class="zero"><span class="value" id="R13">0</span><span class="label">R₁₃</span></td>
+<td class="force"><span class="value" id="F1">-1</span><span class="label">F₁</span></td>
+</tr>
+<tr>
+<th>y₂</th>
+<td class="zero"><span class="value" id="R21">0</span><span class="label">R₂₁</span></td>
+<td class="diag"><span class="value" id="Q22">90</span><span class="label">Q₂₂</span></td>
+<td class="zero"><span class="value" id="R23">0</span><span class="label">R₂₃</span></td>
+<td class="force"><span class="value" id="F2">-1</span><span class="label">F₂</span></td>
+</tr>
+<tr>
+<th>y₃</th>
+<td class="zero"><span class="value" id="R31">0</span><span class="label">R₃₁</span></td>
+<td class="zero"><span class="value" id="R32">0</span><span class="label">R₂</span></td>
+<td class="diag"><span class="value" id="Q33">70</span><span class="label">Q₃</span></td>
+<td class="force"><span class="value" id="F3">-1</span><span class="label">F</span></td>
+</tr>
+</tbody>
+</table>
+<div class="matrix-note">Знаки связей противоположны обычной матрице (по Шатихину)</div>
+</div>
+
+<!-- БЛОК РАЗРАБОТЧИКОВ -->
+<div class="dev-block">
+<h4>👥 Разработчики и научная основа</h4>
+<div class="dev-row"><strong>Разработчик:</strong> <span class="highlight">Елисеев Андрей Владимирович</span></div>
+<div class="dev-row"><strong>Научная основа:</strong></div>
+<div class="dev-row">• Структурные матрицы — <strong>Л. Г. Шатихин</strong></div>
+<div class="dev-row ai-note">Интеллектуальная поддержка: AI-ассистент Qwen (Alibaba Cloud)</div>
+<div class="dev-footer">
+<div class="dev-author">Елисеев А.В.</div>
+© 2026 Все права защищены
+<div class="dev-email">📧 eavsh@ya.ru</div>
+</div>
+</div>
+
+</div>
+
+<div class="controls">
+<div class="btn-row">
+<button id="scanBtn">▶ Сканировать</button>
+<button id="resetBtn"> Сброс</button>
+<button id="exportBtn">💾 Экспорт</button>
+</div>
+<div class="status" id="status">Готов к сканированию</div>
+<div class="legend" id="legendBox">
+<div class="legend-item"><div class="dot" style="background:#2196f3"></div>y₁</div>
+<div class="legend-item"><div class="dot" style="background:#ff9800"></div>y₂</div>
+<div class="legend-item"><div class="dot" style="background:#9c27b0"></div>y₃</div>
+</div>
+</div>
+
+<script>
+const simC=document.getElementById('simCanvas'),simX=simC.getContext('2d');
+const grC=document.getElementById('graphCanvas'),grX=grC.getContext('2d');
+let m1=5,m2=5,m3=5;
+let kA1=50,cA1=1,kA2=0,cA2=0,kA3=0,cA3=0;
+let kB1=0,cB1=0,kB2=0,cB2=0,kB3=50,cB3=1;
+let k12=20,c12=0,k23=20,c23=0,k13=0,c13=0;
+let F0=20,settleT=5,forceOn=1,viewMode='amps';
+let y1=0,y2=0,y3=0,v1=0,v2=0,v3=0,t=0,fW=0;
+let pts1=[],pts2=[],pts3=[],ptsT=[],scanning=false,scanW=0.5,step=0.3;
+let phase='idle',phaseTime=0,mA1=0,mA2=0,mA3=0;
+let currentScale=30,targetScale=30,fadeFactor=1;
+
+document.getElementById('toggleSettings').addEventListener('click',()=>{document.getElementById('settingsPanel').classList.add('open');});
+document.getElementById('closeSettings').addEventListener('click',()=>{document.getElementById('settingsPanel').classList.remove('open');});
+document.getElementById('helpBtn').addEventListener('click',()=>{document.getElementById('modal').classList.add('open');});
+document.getElementById('closeModal').addEventListener('click',()=>{document.getElementById('modal').classList.remove('open');});
+document.getElementById('modal').addEventListener('click',function(e){if(e.target===this){this.classList.remove('open');}});
+document.getElementById('closeExportBtn').addEventListener('click',()=>{document.getElementById('exportModal').classList.remove('open');});
+document.getElementById('exportModal').addEventListener('click',function(e){if(e.target===this){this.classList.remove('open');}});
+
+document.getElementById('copyBtn').addEventListener('click',function(){
+  const textarea=document.getElementById('exportData');
+  textarea.select();
+  textarea.setSelectionRange(0,99999);
+  document.execCommand('copy');
+  this.textContent='✅ Скопировано!';
+  setTimeout(()=>{this.textContent='📋 Копировать';},2000);
+});
+
+function resize(){simC.width=simC.clientWidth;simC.height=simC.clientHeight;grC.width=grC.clientWidth;grC.height=grC.clientHeight;}
+window.addEventListener('resize',resize);
+setTimeout(resize,100);
+
+function updateMatrix(){
+  const C11=cA1+cB1+c12+c13, C22=cA2+cB2+c12+c23, C33=cA3+cB3+c23+c13;
+  const K11=kA1+kB1+k12+k13, K22=kA2+kB2+k12+k23, K33=kA3+kB3+k23+k13;
+  const C12=-c12, C13=-c13, C23=-c23;
+  const K12=-k12, K13=-k13, K23=-k23;
+  document.getElementById('Q11').textContent = `${m1}p²+${C11}p+${K11}`;
+  document.getElementById('Q22').textContent = `${m2}p²+${C22}p+${K22}`;
+  document.getElementById('Q33').textContent = `${m3}p²+${C33}p+${K33}`;
+  const R12 = C12!==0||K12!==0 ? `${C12}p+${K12}` : '0';
+  const R13 = C13!==0||K13!==0 ? `${C13}p+${K13}` : '0';
+  const R23 = C23!==0||K23!==0 ? `${C23}p+${K23}` : '0';
+  document.getElementById('R12').textContent = R12;
+  document.getElementById('R21').textContent = R12;
+  document.getElementById('R13').textContent = R13;
+  document.getElementById('R31').textContent = R13;
+  document.getElementById('R23').textContent = R23;
+  document.getElementById('R32').textContent = R23;
+  document.getElementById('F1').textContent = forceOn===1 ? '-1' : '0';
+  document.getElementById('F2').textContent = forceOn===2 ? '-1' : '0';
+  document.getElementById('F3').textContent = forceOn===3 ? '-1' : '0';
+  const setCellClass=(id,val)=>{
+    const el=document.getElementById(id).parentElement;
+    if(val==='0') el.className='zero';
+    else if(id.startsWith('Q')) el.className='diag';
+    else if(id.startsWith('F')) el.className='force';
+    else el.className='link';
+  };
+  setCellClass('Q11','diag'); setCellClass('Q22','diag'); setCellClass('Q33','diag');
+  setCellClass('R12',R12); setCellClass('R21',R12); setCellClass('R13',R13);
+  setCellClass('R31',R13); setCellClass('R23',R23); setCellClass('R32',R23);
+  setCellClass('F1',document.getElementById('F1').textContent);
+  setCellClass('F2',document.getElementById('F2').textContent);
+  setCellClass('F3',document.getElementById('F3').textContent);
+}
+
+const paramIds=['m1','m2','m3','kA1','cA1','kA2','cA2','kA3','cA3','kB1','cB1','kB2','cB2','kB3','cB3','k12','c12','k23','c23','k13','c13','F0','settleT'];
+paramIds.forEach(id=>{
+document.getElementById(id).addEventListener('input',e=>{
+document.getElementById(id+'Val').textContent=e.target.value;
+m1=+document.getElementById('m1').value;m2=+document.getElementById('m2').value;m3=+document.getElementById('m3').value;
+kA1=+document.getElementById('kA1').value;cA1=+document.getElementById('cA1').value;
+kA2=+document.getElementById('kA2').value;cA2=+document.getElementById('cA2').value;
+kA3=+document.getElementById('kA3').value;cA3=+document.getElementById('cA3').value;
+kB1=+document.getElementById('kB1').value;cB1=+document.getElementById('cB1').value;
+kB2=+document.getElementById('kB2').value;cB2=+document.getElementById('cB2').value;
+kB3=+document.getElementById('kB3').value;cB3=+document.getElementById('cB3').value;
+k12=+document.getElementById('k12').value;c12=+document.getElementById('c12').value;
+k23=+document.getElementById('k23').value;c23=+document.getElementById('c23').value;
+k13=+document.getElementById('k13').value;c13=+document.getElementById('c13').value;
+F0=+document.getElementById('F0').value;settleT=+document.getElementById('settleT').value;
+updateMatrix();
+reset();
+});
+});
+document.getElementById('forceOn').addEventListener('change',e=>{forceOn=+e.target.value;updateMatrix();reset();});
+document.getElementById('viewMode').addEventListener('change',e=>{
+viewMode=e.target.value;
+const leg=document.getElementById('legendBox');
+if(viewMode==='amps'){leg.innerHTML=`<div class="legend-item"><div class="dot" style="background:#2196f3"></div>y₁</div><div class="legend-item"><div class="dot" style="background:#ff9800"></div>y₂</div><div class="legend-item"><div class="dot" style="background:#9c27b0"></div>y₃</div>`;}
+else if(viewMode==='trans_21'){leg.innerHTML=`<div class="legend-item"><div class="dot" style="background:#e040fb"></div>|y₂/y₁|</div><div class="legend-item"><div class="line" style="border-color:#e040fb"></div>теория</div>`;}
+else if(viewMode==='trans_32'){leg.innerHTML=`<div class="legend-item"><div class="dot" style="background:#e040fb"></div>|y₃/y₂|</div><div class="legend-item"><div class="line" style="border-color:#e040fb"></div>теория</div>`;}
+else if(viewMode==='trans_31'){leg.innerHTML=`<div class="legend-item"><div class="dot" style="background:#e040fb"></div>|y₃/y₁|</div><div class="legend-item"><div class="line" style="border-color:#e040fb"></div>теория</div>`;}
+reset();
+});
+
+function reset(){y1=y2=y3=v1=v2=v3=t=0;mA1=mA2=mA3=phaseTime=0;pts1=[];pts2=[];pts3=[];ptsT=[];scanning=false;scanW=0.5;phase='idle';currentScale=targetScale=30;fadeFactor=1;document.getElementById('status').textContent='Сброшено';}
+
+function physics(dt){
+const F1=(forceOn===1)?F0*Math.sin(fW*t):0;
+const F2=(forceOn===2)?F0*Math.sin(fW*t):0;
+const F3=(forceOn===3)?F0*Math.sin(fW*t):0;
+const K11=kA1+kB1+k12+k13,K22=kA2+kB2+k12+k23,K33=kA3+kB3+k23+k13;
+const K12=-k12,K13=-k13,K23=-k23;
+const C11=cA1+cB1+c12+c13,C22=cA2+cB2+c12+c23,C33=cA3+cB3+c23+c13;
+const C12=-c12,C13=-c13,C23=-c23;
+const a1=(-C11*v1-C12*v2-C13*v3-K11*y1-K12*y2-K13*y3+F1)/m1;
+const a2=(-C12*v1-C22*v2-C23*v3-K12*y1-K22*y2-K23*y3+F2)/m2;
+const a3=(-C13*v1-C23*v2-C33*v3-K13*y1-K23*y2-K33*y3+F3)/m3;
+v1+=a1*dt;v2+=a2*dt;v3+=a3*dt;
+y1+=v1*dt;y2+=v2*dt;y3+=v3*dt;
+t+=dt;
+}
+
+function solve3x3(w){
+if(w<1e-6)return{A1:0,A2:0,A3:0,T_21:0,T_32:0,T_31:0};
+const K11=kA1+kB1+k12+k13,K22=kA2+kB2+k12+k23,K33=kA3+kB3+k23+k13;
+const K12=-k12,K13=-k13,K23=-k23;
+const C11=cA1+cB1+c12+c13,C22=cA2+cB2+c12+c23,C33=cA3+cB3+c23+c13;
+const C12=-c12,C13=-c13,C23=-c23;
+const Z11r=K11-w*w*m1,Z11i=w*C11;
+const Z22r=K22-w*w*m2,Z22i=w*C22;
+const Z33r=K33-w*w*m3,Z33i=w*C33;
+const Z12r=K12,Z12i=w*C12;
+const Z13r=K13,Z13i=w*C13;
+const Z23r=K23,Z23i=w*C23;
+const a=Z11r,b=Z11i,d=Z22r,e=Z22i,g=Z33r,h=Z33i;
+const c12c=Z12r,f=Z12i,i13=Z13r,j=Z13i,p=Z23r,q=Z23i;
+const Z22Z33r=d*g-e*h,Z22Z33i=d*h+e*g;
+const Z23sq=p*p-q*q,Z23sqi=2*p*q;
+const A1r=Z22Z33r-Z23sq,A1i=Z22Z33i-Z23sqi;
+const Z12Z33r=c12c*g-f*h,Z12Z33i=c12c*h+f*g;
+const Z23Z13r=p*i13-q*j,Z23Z13i=p*j+q*i13;
+const A2r=Z12Z33r-Z23Z13r,A2i=Z12Z33i-Z23Z13i;
+const Z12Z23r=c12c*p-f*q,Z12Z23i=c12c*q+f*p;
+const Z22Z13r=d*i13-e*j,Z22Z13i=d*j+e*i13;
+const A3r=Z12Z23r-Z22Z13r,A3i=Z12Z23i-Z22Z13i;
+const DetR=a*A1r-b*A1i-c12c*A2r+f*A2i+i13*A3r-j*A3i;
+const DetI=a*A1i+b*A1r-c12c*A2i-f*A2r+i13*A3i+j*A3r;
+const mag2=DetR*DetR+DetI*DetI;
+if(mag2<1e-12)return{A1:0,A2:0,A3:0,T_21:0,T_32:0,T_31:0};
+const C11r=A1r,C11i=A1i;
+const C22r=a*g-b*h-i13*i13+j*j,C22i=a*h+b*g-2*i13*j;
+const C33r=a*d-b*e-c12c*c12c+f*f,C33i=a*e+b*d-2*c12c*f;
+const C12r=-(c12c*g-f*h-i13*p+j*q),C12i=-(c12c*h+f*g-i13*q-j*p);
+const C13r=c12c*p-f*q-d*i13+e*j,C13i=c12c*q+f*p-d*j-e*i13;
+const C23r=-(a*p-b*q-c12c*i13+f*j),C23i=-(a*q+b*p-c12c*j-f*i13);
+let H1r=0,H1i=0,H2r=0,H2i=0,H3r=0,H3i=0;
+if(forceOn===1){
+H1r=(C11r*DetR+C11i*DetI)/mag2*F0;H1i=(C11i*DetR-C11r*DetI)/mag2*F0;
+H2r=(C12r*DetR+C12i*DetI)/mag2*F0;H2i=(C12i*DetR-C12r*DetI)/mag2*F0;
+H3r=(C13r*DetR+C13i*DetI)/mag2*F0;H3i=(C13i*DetR-C13r*DetI)/mag2*F0;
+}else if(forceOn===2){
+H1r=(C12r*DetR+C12i*DetI)/mag2*F0;H1i=(C12i*DetR-C12r*DetI)/mag2*F0;
+H2r=(C22r*DetR+C22i*DetI)/mag2*F0;H2i=(C22i*DetR-C22r*DetI)/mag2*F0;
+H3r=(C23r*DetR+C23i*DetI)/mag2*F0;H3i=(C23i*DetR-C23r*DetI)/mag2*F0;
+}else{
+H1r=(C13r*DetR+C13i*DetI)/mag2*F0;H1i=(C13i*DetR-C13r*DetI)/mag2*F0;
+H2r=(C23r*DetR+C23i*DetI)/mag2*F0;H2i=(C23i*DetR-C23r*DetI)/mag2*F0;
+H3r=(C33r*DetR+C33i*DetI)/mag2*F0;H3i=(C33i*DetR-C33r*DetI)/mag2*F0;
+}
+const A1=Math.sqrt(H1r*H1r+H1i*H1i);
+const A2=Math.sqrt(H2r*H2r+H2i*H2i);
+const A3=Math.sqrt(H3r*H3r+H3i*H3i);
+const num21r=H2r/F0,num21i=H2i/F0;
+const den21r=H1r/F0,den21i=H1i/F0;
+const denMag2_21=den21r*den21r+den21i*den21i;
+const Tr_21=(num21r*den21r+num21i*den21i)/(denMag2_21||1e-12);
+const Ti_21=(num21i*den21r-num21r*den21i)/(denMag2_21||1e-12);
+const T_21=Math.sqrt(Tr_21*Tr_21+Ti_21*Ti_21);
+const num32r=H3r/F0,num32i=H3i/F0;
+const den32r=H2r/F0,den32i=H2i/F0;
+const denMag2_32=den32r*den32r+den32i*den32i;
+const Tr_32=(num32r*den32r+num32i*den32i)/(denMag2_32||1e-12);
+const Ti_32=(num32i*den32r-num32r*den32i)/(denMag2_32||1e-12);
+const T_32=Math.sqrt(Tr_32*Tr_32+Ti_32*Ti_32);
+const num31r=H3r/F0,num31i=H3i/F0;
+const den31r=H1r/F0,den31i=H1i/F0;
+const denMag2_31=den31r*den31r+den31i*den31i;
+const Tr_31=(num31r*den31r+num31i*den31i)/(denMag2_31||1e-12);
+const Ti_31=(num31i*den31r-num31r*den31i)/(denMag2_31||1e-12);
+const T_31=Math.sqrt(Tr_31*Tr_31+Ti_31*Ti_31);
+return{A1,A2,A3,T_21,T_32,T_31};
+}
+
+function drawLink(x1,y1,x2,y2,param,type){
+if(param===0)return;
+const dx=x2-x1,dy=y2-y1,dist=Math.hypot(dx,dy);
+if(dist<5)return;
+const height=dist*0.3;
+const cx=(x1+x2)/2;
+let cy;
+if(type==='top'){cy=(y1+y2)/2-height;simX.strokeStyle='#4caf50';simX.lineWidth=2;simX.setLineDash([]);}
+else{cy=(y1+y2)/2+height;simX.strokeStyle='#2196f3';simX.lineWidth=2;simX.setLineDash([4,4]);}
+simX.beginPath();simX.moveTo(x1,y1);simX.quadraticCurveTo(cx,cy,x2,y2);simX.stroke();simX.setLineDash([]);
+}
+
+function drawSim(){
+const W=simC.width,H=simC.height;
+simX.clearRect(0,0,W,H);
+const eqY=H/2;
+const maxDisp=Math.max(Math.abs(y1),Math.abs(y2),Math.abs(y3),0.5);
+targetScale=Math.min(50,(H*0.35)/maxDisp);
+currentScale+=(targetScale-currentScale)*0.15;
+const sc=currentScale*fadeFactor;
+const xs1=25,xm1=W*0.25,xm2=W*0.5,xm3=W*0.75,xs2=W-25;
+const ym1=eqY+y1*sc,ym2=eqY+y2*sc,ym3=eqY+y3*sc;
+simX.fillStyle='#444';
+simX.fillRect(xs1-10,eqY-40,20,80);
+simX.fillRect(xs2-10,eqY-40,20,80);
+simX.strokeStyle='#666';simX.lineWidth=1;
+for(let i=0;i<8;i++){
+simX.beginPath();simX.moveTo(xs1-10,eqY-35+i*10);simX.lineTo(xs1-20,eqY-45+i*10);simX.stroke();
+simX.beginPath();simX.moveTo(xs2+10,eqY-35+i*10);simX.lineTo(xs2+20,eqY-45+i*10);simX.stroke();
+}
+drawLink(xs1,eqY,xm1,ym1,kA1,'top');
+drawLink(xs1,eqY,xm2,ym2,kA2,'top');
+drawLink(xs1,eqY,xm3,ym3,kA3,'top');
+drawLink(xs2,eqY,xm1,ym1,kB1,'top');
+drawLink(xs2,eqY,xm2,ym2,kB2,'top');
+drawLink(xs2,eqY,xm3,ym3,kB3,'top');
+drawLink(xm1,ym1,xm2,ym2,k12,'top');
+drawLink(xm2,ym2,xm3,ym3,k23,'top');
+drawLink(xm1,ym1,xm3,ym3,k13,'top');
+drawLink(xs1,eqY,xm1,ym1,cA1,'bottom');
+drawLink(xs1,eqY,xm2,ym2,cA2,'bottom');
+drawLink(xs1,eqY,xm3,ym3,cA3,'bottom');
+drawLink(xs2,eqY,xm1,ym1,cB1,'bottom');
+drawLink(xs2,eqY,xm2,ym2,cB2,'bottom');
+drawLink(xs2,eqY,xm3,ym3,cB3,'bottom');
+drawLink(xm1,ym1,xm2,ym2,c12,'bottom');
+drawLink(xm2,ym2,xm3,ym3,c23,'bottom');
+drawLink(xm1,ym1,xm3,ym3,c13,'bottom');
+const drawMass=(x,y,label,color)=>{
+simX.fillStyle=color;simX.fillRect(x-22,y-18,44,36);
+simX.strokeStyle='#fff';simX.lineWidth=2;simX.strokeRect(x-22,y-18,44,36);
+simX.fillStyle='#fff';simX.font='bold 12px sans-serif';
+simX.textAlign='center';simX.textBaseline='middle';simX.fillText(label,x,y);
+};
+drawMass(xm1,ym1,'m₁','#2196f3');
+drawMass(xm2,ym2,'m₂','#ff9800');
+drawMass(xm3,ym3,'m₃','#9c27b0');
+const fxs=forceOn===1?xm1:(forceOn===2?xm2:xm3);
+const fys=forceOn===1?ym1:(forceOn===2?ym2:ym3);
+const F=F0*Math.sin(fW*t);
+const arr=F*0.8;
+simX.strokeStyle='#f44336';simX.fillStyle='#f44336';simX.lineWidth=3;
+simX.beginPath();simX.moveTo(fxs,fys+22);simX.lineTo(fxs,fys+22+arr);simX.stroke();
+if(Math.abs(arr)>5){
+const tip=fys+22+arr,d=arr>0?1:-1;
+simX.beginPath();simX.moveTo(fxs,tip);simX.lineTo(fxs-5,tip-7*d);simX.lineTo(fxs+5,tip-7*d);
+simX.closePath();simX.fill();
+}
+simX.strokeStyle='#555';simX.setLineDash([4,4]);simX.lineWidth=1;
+simX.beginPath();simX.moveTo(15,eqY);simX.lineTo(W-15,eqY);simX.stroke();simX.setLineDash([]);
+simX.fillStyle='#aaa';simX.font='10px monospace';simX.textAlign='left';
+simX.fillText(`y₁:${y1.toFixed(2)} y₂:${y2.toFixed(2)} y₃:${y3.toFixed(2)}`,10,20);
+simX.fillText(`Фаза: ${phase}`,10,35);
+}
+
+function drawGraph(){
+const W=grC.width,H=grC.height;
+grX.clearRect(0,0,W,H);
+const M={l:40,r:10,t:10,b:30};
+const pW=W-M.l-M.r,pH=H-M.t-M.b,mW=15;
+let mA=1;
+if(viewMode==='amps'){for(let i=0;i<=50;i++){const w=(i/50)*mW;const{A1,A2,A3}=solve3x3(w);if(A1>mA)mA=A1;if(A2>mA)mA=A2;if(A3>mA)mA=A3;}}
+else if(viewMode==='trans_21'){for(let i=0;i<=50;i++){const w=(i/50)*mW;const{T_21}=solve3x3(w);if(T_21>mA)mA=T_21;}}
+else if(viewMode==='trans_32'){for(let i=0;i<=50;i++){const w=(i/50)*mW;const{T_32}=solve3x3(w);if(T_32>mA)mA=T_32;}}
+else if(viewMode==='trans_31'){for(let i=0;i<=50;i++){const w=(i/50)*mW;const{T_31}=solve3x3(w);if(T_31>mA)mA=T_31;}}
+mA=Math.min(mA*1.2,50);
+grX.strokeStyle='#888';grX.lineWidth=1.5;
+grX.beginPath();grX.moveTo(M.l,M.t);grX.lineTo(M.l,M.t+pH);grX.lineTo(M.l+pW,M.t+pH);grX.stroke();
+grX.fillStyle='#aaa';grX.font='10px sans-serif';grX.textAlign='center';
+grX.fillText('ω, рад/с',M.l+pW/2,H-5);
+grX.save();grX.translate(10,M.t+pH/2);grX.rotate(-Math.PI/2);
+let yLabel='Податливость';
+if(viewMode==='trans_21')yLabel='|y₂/y₁|';
+else if(viewMode==='trans_32')yLabel='|y₃/y₂|';
+else if(viewMode==='trans_31')yLabel='|y₃/y₁|';
+grX.fillText(yLabel,0,0);grX.restore();
+grX.strokeStyle='#333';grX.lineWidth=1;grX.beginPath();
+for(let i=0;i<=5;i++){
+const py=M.t+pH-(i/5)*pH;
+grX.moveTo(M.l,py);grX.lineTo(M.l+pW,py);
+grX.fillStyle='#888';grX.textAlign='right';
+grX.fillText(((i/5)*mA).toFixed(1),M.l-3,py+3);
+const px=M.l+(i/5)*pW;
+grX.moveTo(px,M.t+pH);grX.lineTo(px,M.t+pH+4);
+grX.textAlign='center';grX.fillText(((i/5)*mW).toFixed(1),px,M.t+pH+15);
+}
+grX.stroke();
+if(viewMode==='amps'){
+const drawCurve=(color,getter)=>{
+grX.strokeStyle=color;grX.lineWidth=2;grX.setLineDash([5,3]);
+grX.beginPath();
+for(let i=0;i<=pW;i++){
+const w=(i/pW)*mW;const val=getter(solve3x3(w));
+const py=M.t+pH-(val/mA)*pH;
+if(i===0)grX.moveTo(M.l+i,py);else grX.lineTo(M.l+i,py);
+}
+grX.stroke();
+};
+drawCurve('rgba(33,150,243,0.7)',d=>d.A1);
+drawCurve('rgba(255,152,0,0.7)',d=>d.A2);
+drawCurve('rgba(156,39,176,0.7)',d=>d.A3);
+grX.setLineDash([]);
+const drawPts=(color,pts)=>{
+grX.fillStyle=color;
+pts.forEach(p=>{
+const px=M.l+(p.w/mW)*pW;const py=M.t+pH-(p.a/mA)*pH;
+grX.beginPath();grX.arc(px,py,3,0,Math.PI*2);grX.fill();
+});
+};
+drawPts('#2196f3',pts1);drawPts('#ff9800',pts2);drawPts('#9c27b0',pts3);
+}else{
+grX.strokeStyle='rgba(224,64,251,0.8)';grX.lineWidth=2;grX.setLineDash([5,3]);
+grX.beginPath();
+for(let i=0;i<=pW;i++){
+const w=(i/pW)*mW;const sol=solve3x3(w);
+let val;
+if(viewMode==='trans_21')val=sol.T_21;
+else if(viewMode==='trans_32')val=sol.T_32;
+else if(viewMode==='trans_31')val=sol.T_31;
+const py=M.t+pH-(val/mA)*pH;
+if(i===0)grX.moveTo(M.l+i,py);else grX.lineTo(M.l+i,py);
+}
+grX.stroke();grX.setLineDash([]);
+grX.fillStyle='#e040fb';
+ptsT.forEach(p=>{
+const px=M.l+(p.w/mW)*pW;const py=M.t+pH-(p.a/mA)*pH;
+grX.beginPath();grX.arc(px,py,4,0,Math.PI*2);grX.fill();
+});
+}
+}
+
+let last=performance.now();
+function loop(now){
+const dt=Math.min((now-last)/1000,0.05);
+last=now;
+if(scanning){
+fW=scanW;
+const T=(scanW>0.1)?(2*Math.PI/scanW):10;
+if(phase==='settle'){
+fadeFactor=1;physics(dt);phaseTime+=dt;
+if(phaseTime>=T*settleT){phase='measure';phaseTime=0;mA1=mA2=mA3=0;document.getElementById('status').textContent='ω = '+scanW.toFixed(1)+' (измерение)';}
+}else if(phase==='measure'){
+fadeFactor=1;physics(dt);phaseTime+=dt;
+if(Math.abs(y1)>mA1)mA1=Math.abs(y1);
+if(Math.abs(y2)>mA2)mA2=Math.abs(y2);
+if(Math.abs(y3)>mA3)mA3=Math.abs(y3);
+if(phaseTime>=T){
+if(viewMode==='amps'){pts1.push({w:scanW,a:mA1});pts2.push({w:scanW,a:mA2});pts3.push({w:scanW,a:mA3});}
+else if(viewMode==='trans_21'){ptsT.push({w:scanW,a:(mA1>1e-6)?(mA2/mA1):0});}
+else if(viewMode==='trans_32'){ptsT.push({w:scanW,a:(mA2>1e-6)?(mA3/mA2):0});}
+else if(viewMode==='trans_31'){ptsT.push({w:scanW,a:(mA1>1e-6)?(mA3/mA1):0});}
+phase='fadeout';phaseTime=0;fadeFactor=1;
+document.getElementById('status').textContent='Затухание...';
+}
+}else if(phase==='fadeout'){
+fadeFactor*=0.95;phaseTime+=dt;
+if(fadeFactor<0.05||phaseTime>1.0){
+y1=y2=y3=v1=v2=v3=0;t=0;fadeFactor=1;scanW+=step;
+if(scanW>15){scanning=false;phase='idle';document.getElementById('status').textContent='Готово!';}
+else{phase='settle';phaseTime=0;mA1=mA2=mA3=0;document.getElementById('status').textContent='ω = '+scanW.toFixed(1)+' (переходный)';}
+}
+}
+}else if(phase!=='idle'){physics(dt);}
+drawSim();drawGraph();
+requestAnimationFrame(loop);
+}
+
+document.getElementById('scanBtn').addEventListener('click',()=>{if(scanning)return;reset();scanning=true;phase='settle';document.getElementById('status').textContent='Сканирование...';});
+document.getElementById('resetBtn').addEventListener('click',reset);
+
+document.getElementById('exportBtn').addEventListener('click',function(){
+  try {
+    const C11=cA1+cB1+c12+c13, C22=cA2+cB2+c12+c23, C33=cA3+cB3+c23+c13;
+    const K11=kA1+kB1+k12+k13, K22=kA2+kB2+k12+k23, K33=kA3+kB3+k23+k13;
+    const theoreticalData = [];
+    for(let w=0.1; w<=15; w+=0.1) {
+      const sol = solve3x3(w);
+      theoreticalData.push({w: w, A1: sol.A1, A2: sol.A2, A3: sol.A3, T21: sol.T_21, T32: sol.T_32, T31: sol.T_31});
+    }
+    const exportObj = {
+      meta: {
+        project: "3-DOF Structural Network (Shatikhin Method)",
+        author: "Eliseev Andrey Vladimirovich",
+        date: new Date().toISOString(),
+        description: "Data for verification and expertise"
+      },
+      parameters: {
+        masses: {m1: m1, m2: m2, m3: m3},
+        stiffness: {kA1, kA2, kA3, kB1, kB2, kB3, k12, k23, k13},
+        damping: {cA1, cA2, cA3, cB1, cB2, cB3, c12, c23, c13},
+        excitation: {F0, forceOn, viewMode}
+      },
+      structural_matrix: {
+        Q11: `${m1}p²+${C11}p+${K11}`,
+        Q22: `${m2}p²+${C22}p+${K22}`,
+        Q33: `${m3}p²+${C33}p+${K33}`,
+        R12: -k12, R13: -k13, R23: -k23
+      },
+      data: {
+        theoretical: theoreticalData,
+        experimental: {y1: pts1, y2: pts2, y3: pts3, transfer: ptsT}
+      }
+    };
+    const jsonStr = JSON.stringify(exportObj, null, 2);
+    document.getElementById('exportData').value = jsonStr;
+    document.getElementById('exportModal').classList.add('open');
+    document.getElementById('status').textContent = '✅ Данные готовы к копированию!';
+    setTimeout(()=>{if(!scanning) document.getElementById('status').textContent='Готов к сканированию';}, 2000);
+  } catch(e) {
+    console.error('Export error:', e);
+    document.getElementById('status').textContent = '❌ Ошибка экспорта: ' + e.message;
+  }
+});
+
+updateMatrix();
+requestAnimationFrame(loop);
+
+// Скрываем splash после полной загрузки
+window.addEventListener('load',function(){
+  setTimeout(()=>{
+    document.getElementById('splash').style.display='none';
+  },1500);
+});
+</script>
+</body>
+</html>
