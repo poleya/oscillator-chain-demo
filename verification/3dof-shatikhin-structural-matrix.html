@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3-DOF: Метод Шатихина</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;color:#e0e0e0;font-family:sans-serif;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* SPLASH SCREEN */
+#splash{
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  background:#0a0a0a;
+  z-index:99999;
+  display:flex;flex-direction:column;
+  justify-content:center;align-items:center;
+  transition:opacity 0.8s ease-out;
+}
+#splash.fade-out{opacity:0;pointer-events:none}
+.splash-logo{margin-bottom:20px;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.splash-title{color:#fff;font-size:20px;letter-spacing:3px;text-transform:uppercase;font-weight:bold}
+.splash-subtitle{color:#888;font-size:13px;margin-top:8px;font-style:italic;letter-spacing:1px}
+
+header{display:flex;justify-content:space-between;align-items:center;padding:10px;background:#1a1a1a;border-bottom:1px solid #333;flex-shrink:0}
+header h2{font-size:14px;color:#fff}
+#toggleSettings{background:#4caf50;color:#fff;border:none;border-radius:4px;padding:8px 14px;font-size:13px;font-weight:bold}
+.workspace{display:flex;flex:1;flex-direction:column;min-height:0}
+@media(min-width:601px){.workspace{flex-direction:row}}
+canvas{flex:1;display:block;background:#000;min-height:0}
+.controls{background:#1a1a1a;padding:10px;border-top:1px solid #333;flex-shrink:0}
+.btn-row{display:flex;gap:8px}
+button{flex:1;padding:12px;border:none;border-radius:6px;font-size:14px;font-weight:bold;color:white;cursor:pointer}
+#scanBtn{background:#4caf50}
+#resetBtn{background:#f44336}
+#exportBtn{background:#2196f3}
+.status{text-align:center;font-size:12px;color:#aaa;margin-top:6px}
+.footer{text-align:center;font-size:10px;color:#555;padding:6px;background:#0a0a0a;border-top:1px solid #222;flex-shrink:0;letter-spacing:0.5px}
+#settingsPanel{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,10,10,0.98);z-index:100;display:none;overflow-y:auto;padding:60px 15px 20px}
+#settingsPanel.open{display:block}
+#closeSettings{position:fixed;top:10px;right:15px;z-index:101;background:#f44336;color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:22px}
+#helpBtn{position:fixed;top:10px;right:65px;z-index:101;background:#2196f3;color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:22px}
+#notesBtn{position:fixed;top:10px;right:115px;z-index:101;background:#ff9800;color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:22px}
+.section-title{color:#4caf50;font-size:13px;font-weight:bold;margin:15px 0 8px;padding-bottom:4px;border-bottom:1px solid #333}
+.sg{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.sg label{font-size:12px;width:110px;color:#ccc}
+.sg input{flex:1;margin:0 8px;accent-color:#4caf50;height:28px}
+.sg span{font-size:12px;color:#4caf50;font-weight:bold;width:40px;text-align:right}
+.sg select{flex:1;background:#222;color:#fff;border:1px solid #444;border-radius:4px;padding:8px;font-size:13px}
+.sg input[type="checkbox"]{width:24px;height:24px;flex:0;margin:0 8px}
+input[type="range"],select{touch-action:manipulation}
+
+.matrix-section{background:#1e1e1e;padding:12px;border-radius:6px;margin-top:15px;border:1px solid #333;overflow-x:auto}
+.matrix-title{text-align:center;color:#4caf50;font-size:11px;font-weight:bold;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
+.matrix-subtitle{text-align:center;color:#888;font-size:9px;margin-bottom:10px;font-style:italic}
+.matrix-table{width:100%;border-collapse:collapse;margin:0 auto;max-width:380px}
+.matrix-table th,.matrix-table td{border:1px solid #444;padding:6px 4px;text-align:center;font-size:10px;font-family:monospace}
+.matrix-table th{background:#333;color:#888;font-size:9px;font-weight:normal}
+.matrix-table .diag{background:#2196f3;color:#fff;font-weight:bold}
+.matrix-table .link{background:#4caf50;color:#fff}
+.matrix-table .zero{background:#3a3a3a;color:#666}
+.matrix-table .force{background:#f44336;color:#fff}
+.matrix-table .label{font-size:8px;opacity:0.8;display:block;margin-top:2px}
+.matrix-table .value{font-size:10px;font-weight:bold;word-break:break-all}
+.matrix-note{text-align:center;font-size:9px;color:#888;margin-top:8px;font-style:italic}
+
+.modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:200;overflow-y:auto;padding:20px}
+.modal.open{display:block}
+.modal-content{background:#1a1a1a;max-width:600px;margin:40px auto;padding:25px;border-radius:10px;border:1px solid #444;position:relative}
+.modal-close{position:absolute;top:10px;right:15px;background:#f44336;color:#fff;border:none;border-radius:50%;width:36px;height:36px;font-size:20px;cursor:pointer}
+.modal-content h3{color:#4caf50;margin-bottom:15px;font-size:18px}
+.modal-content h4{color:#2196f3;margin:15px 0 5px 0;font-size:14px}
+.modal-content p{color:#ccc;font-size:13px;line-height:1.5;margin-bottom:10px}
+.modal-content ul{color:#ccc;font-size:13px;line-height:1.6;margin:10px 0;padding-left:20px}
+.modal-credits{background:#1e1e1e;padding:12px;border-radius:5px;margin:15px 0;border-left:3px solid #4caf50}
+.modal-credits p{color:#e0e0e0;font-size:12px;margin:0}
+
+#exportData{width:100%;height:250px;background:#0a0a0a;color:#e0e0e0;border:1px solid #444;border-radius:5px;padding:10px;font-family:monospace;font-size:10px;resize:vertical;margin-top:10px}
+.export-btn-row{display:flex;gap:8px;margin-top:12px}
+.export-btn-row button{flex:1}
+#copyBtn{background:#2196f3}
+
+#noteInput{width:100%;min-height:80px;background:#0a0a0a;color:#e0e0e0;border:1px solid #444;border-radius:5px;padding:10px;font-size:13px;resize:vertical;font-family:sans-serif}
+#addNoteBtn{width:100%;background:#ff9800;margin-top:10px;padding:12px}
+#notesList{margin-top:15px;max-height:300px;overflow-y:auto}
+.note-item{background:#1e1e1e;padding:10px;border-radius:5px;margin-bottom:8px;border-left:3px solid #ff9800;position:relative}
+.note-time{color:#888;font-size:10px;margin-bottom:4px;font-family:monospace}
+.note-text{color:#e0e0e0;font-size:12px;line-height:1.4;white-space:pre-wrap;word-break:break-word}
+.note-delete{position:absolute;top:8px;right:8px;background:#f44336;color:#fff;border:none;border-radius:50%;width:24px;height:24px;font-size:14px;cursor:pointer;line-height:1}
+.notes-empty{color:#666;font-size:12px;text-align:center;padding:20px;font-style:italic}
+.storage-warning{background:#3a2a00;border:1px solid #ff9800;border-radius:5px;padding:10px;margin-bottom:12px;color:#ffb74d;font-size:11px;line-height:1.4}
+.storage-ok{background:#0a2a0a;border:1px solid #4caf50;border-radius:5px;padding:8px;margin-bottom:12px;color:#81c784;font-size:11px}
+
+.ic-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.ic-grid .sg{margin-bottom:0}
+.ic-grid .sg label{width:50px;font-size:11px}
+.ic-grid .sg span{width:35px;font-size:11px}
+</style>
+</head>
+<body>
+
+<!-- SPLASH SCREEN -->
+<div id="splash">
+  <svg class="splash-logo" width="200" height="120" viewBox="0 0 240 120">
+    <path d="M 10 35 Q 30 10, 50 35 Q 70 60, 90 35 Q 110 10, 130 35 Q 150 60, 170 35 Q 190 10, 210 35 Q 220 22, 230 35" 
+          stroke="#2196f3" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M 10 85 Q 30 60, 50 85 Q 70 110, 90 85 Q 110 60, 130 85 Q 150 110, 170 85 Q 190 60, 210 85 Q 220 72, 230 85" 
+          stroke="#4caf50" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <circle cx="120" cy="60" r="9" fill="#ff0000">
+      <animate attributeName="r" values="8;10;8" dur="1.5s" repeatCount="infinite"/>
+    </circle>
+  </svg>
+  <div class="splash-title">механика вибраций</div>
+  <div class="splash-subtitle">в примерах</div>
+</div>
+
+<header>
+<h2>3-DOF: Структурная сеть</h2>
+<button id="toggleSettings">⚙ Настройки</button>
+</header>
+
+<div class="workspace">
+<canvas id="simCanvas"></canvas>
+<canvas id="graphCanvas"></canvas>
+</div>
+
+<div class="controls">
+<div class="btn-row">
+<button id="scanBtn">▶ Старт</button>
+<button id="resetBtn">Сброс</button>
+<button id="exportBtn">💾 Экспорт</button>
+</div>
+<div class="status" id="status">Готов</div>
+</div>
+
+<div class="footer">© Елисеев А.В. 2026</div>
+
+<div id="settingsPanel">
+<button id="closeSettings">✕</button>
+<button id="helpBtn">?</button>
+<button id="notesBtn">📝</button>
+
+<div class="section-title">🎯 РЕЖИМ РАБОТЫ</div>
+<div class="sg"><label>Тип:</label>
+<select id="simMode">
+<option value="scan">Частотное сканирование (АЧХ)</option>
+<option value="free">Свободные колебания (от НУ)</option>
+<option value="forced">Вынужденные колебания</option>
+</select>
+</div>
+
+<div id="scanSettings">
+<div class="section-title">📊 ДИАПАЗОН АЧХ</div>
+<div class="sg"><label>Мин. (рад/с)</label><input type="range" id="scanMin" min="0.1" max="30" value="0.5" step="0.1"><span id="scanMinVal">0.5</span></div>
+<div class="sg"><label>Макс. (рад/с)</label><input type="range" id="scanMax" min="5" max="200" value="30" step="1"><span id="scanMaxVal">30</span></div>
+<div style="font-size:10px;color:#666;margin:-4px 0 10px 110px;font-style:italic">до ~30 Гц (≈188 рад/с)</div>
+</div>
+
+<div id="freeSettings" style="display:none">
+<div class="section-title">📐 НАЧАЛЬНЫЕ УСЛОВИЯ</div>
+<div class="ic-grid">
+<div class="sg"><label>y₁(0)</label><input type="range" id="y1_0" min="-10" max="10" value="2" step="0.5"><span id="y1_0Val">2.0</span></div>
+<div class="sg"><label>v₁(0)</label><input type="range" id="v1_0" min="-10" max="10" value="0" step="0.5"><span id="v1_0Val">0.0</span></div>
+<div class="sg"><label>y₂(0)</label><input type="range" id="y2_0" min="-10" max="10" value="0" step="0.5"><span id="y2_0Val">0.0</span></div>
+<div class="sg"><label>v₂(0)</label><input type="range" id="v2_0" min="-10" max="10" value="0" step="0.5"><span id="v2_0Val">0.0</span></div>
+<div class="sg"><label>y₃(0)</label><input type="range" id="y3_0" min="-10" max="10" value="0" step="0.5"><span id="y3_0Val">0.0</span></div>
+<div class="sg"><label>v₃(0)</label><input type="range" id="v3_0" min="-10" max="10" value="0" step="0.5"><span id="v3_0Val">0.0</span></div>
+</div>
+<div style="font-size:10px;color:#666;margin-top:6px;font-style:italic">Внешняя сила F=0. Колебания — только от НУ.</div>
+</div>
+
+<div id="forcedSettings" style="display:none">
+<div class="section-title">⚡ ВЫНУЖДЕННЫЕ КОЛЕБАНИЯ</div>
+<div class="sg"><label>Частота ω (рад/с)</label><input type="range" id="forcedFreq" min="0.1" max="50" value="3" step="0.1"><span id="forcedFreqVal">3.0</span></div>
+<div class="sg"><label>Амплитуда F₀</label><input type="range" id="F0_forced" min="1" max="50" value="20" step="1"><span id="F0_forcedVal">20</span></div>
+<div class="sg"><label>Приложена к:</label>
+<select id="forceOn_forced"><option value="1">m₁</option><option value="2">m₂</option><option value="3">m₃</option></select>
+</div>
+<div style="font-size:10px;color:#666;margin-top:6px;font-style:italic">Начальные условия нулевые. F(t) = F₀·sin(ωt)</div>
+</div>
+
+<div class="section-title">🎥 ВИЗУАЛИЗАЦИЯ</div>
+<div class="sg"><label>След (Trail)</label><input type="checkbox" id="trailOn" checked></div>
+<div class="sg"><label>Длина следа</label><input type="range" id="trailLen" min="1" max="20" value="8" step="1"><span id="trailLenVal">8</span></div>
+<div class="sg"><label>Стробоскоп</label><input type="checkbox" id="strobeOn"></div>
+<div class="sg"><label>Частота строба</label><input type="range" id="strobeFreq" min="0.5" max="50" value="5.0" step="0.1"><span id="strobeFreqVal">5.0</span></div>
+<div style="font-size:10px;color:#666;margin:-4px 0 10px 110px;font-style:italic">Совпадение с ω = заморозка</div>
+
+<div class="section-title">⚖ МАССЫ</div>
+<div class="sg"><label>m₁</label><input type="range" id="m1" min="1" max="20" value="5" step="1"><span id="m1Val">5</span></div>
+<div class="sg"><label>m₂</label><input type="range" id="m2" min="1" max="20" value="5" step="1"><span id="m2Val">5</span></div>
+<div class="sg"><label>m₃</label><input type="range" id="m3" min="1" max="20" value="5" step="1"><span id="m3Val">5</span></div>
+
+<div class="section-title">🔗 СВЯЗИ С ОПОРЫ A</div>
+<div class="sg"><label>k_A1</label><input type="range" id="kA1" min="0" max="200" value="50" step="5"><span id="kA1Val">50</span></div>
+<div class="sg"><label>c_A1</label><input type="range" id="cA1" min="0" max="5" value="1" step="0.1"><span id="cA1Val">1.0</span></div>
+<div class="sg"><label>k_A2</label><input type="range" id="kA2" min="0" max="200" value="0" step="5"><span id="kA2Val">0</span></div>
+<div class="sg"><label>c_A2</label><input type="range" id="cA2" min="0" max="5" value="0" step="0.1"><span id="cA2Val">0</span></div>
+<div class="sg"><label>k_A3</label><input type="range" id="kA3" min="0" max="200" value="0" step="5"><span id="kA3Val">0</span></div>
+<div class="sg"><label>c_A3</label><input type="range" id="cA3" min="0" max="5" value="0" step="0.1"><span id="cA3Val">0</span></div>
+
+<div class="section-title">🔗 СВЯЗИ С ОПОРЫ B</div>
+<div class="sg"><label>k_B1</label><input type="range" id="kB1" min="0" max="200" value="0" step="5"><span id="kB1Val">0</span></div>
+<div class="sg"><label>c_B1</label><input type="range" id="cB1" min="0" max="5" value="0" step="0.1"><span id="cB1Val">0</span></div>
+<div class="sg"><label>k_B2</label><input type="range" id="kB2" min="0" max="200" value="0" step="5"><span id="kB2Val">0</span></div>
+<div class="sg"><label>c_B2</label><input type="range" id="cB2" min="0" max="5" value="0" step="0.1"><span id="cB2Val">0</span></div>
+<div class="sg"><label>k_B3</label><input type="range" id="kB3" min="0" max="200" value="50" step="5"><span id="kB3Val">50</span></div>
+<div class="sg"><label>c_B3</label><input type="range" id="cB3" min="0" max="5" value="1" step="0.1"><span id="cB3Val">1.0</span></div>
+
+<div class="section-title">🔗 МЕЖМАССОВЫЕ СВЯЗИ</div>
+<div class="sg"><label>k₁₂</label><input type="range" id="k12" min="0" max="100" value="20" step="5"><span id="k12Val">20</span></div>
+<div class="sg"><label>c₁₂</label><input type="range" id="c12" min="0" max="5" value="0" step="0.1"><span id="c12Val">0</span></div>
+<div class="sg"><label>k₂₃</label><input type="range" id="k23" min="0" max="100" value="20" step="5"><span id="k23Val">20</span></div>
+<div class="sg"><label>c₂₃</label><input type="range" id="c23" min="0" max="5" value="0" step="0.1"><span id="c23Val">0</span></div>
+<div class="sg"><label>k₁₃</label><input type="range" id="k13" min="0" max="100" value="0" step="5"><span id="k13Val">0</span></div>
+<div class="sg"><label>c₁₃</label><input type="range" id="c13" min="0" max="5" value="0" step="0.1"><span id="c13Val">0</span></div>
+
+<div id="scanExcitation">
+<div class="section-title">⚡ ВОЗБУЖДЕНИЕ (сканирование)</div>
+<div class="sg"><label>Сила F₀</label><input type="range" id="F0" min="1" max="50" value="20" step="1"><span id="F0Val">20</span></div>
+<div class="sg"><label>Сила на:</label>
+<select id="forceOn"><option value="1">m₁</option><option value="2">m₂</option><option value="3">m₃</option></select>
+</div>
+<div class="sg"><label>Режим графика:</label>
+<select id="viewMode">
+<option value="amps">АЧХ (y₁, y₂, y₃)</option>
+<option value="trans_21">|y₂/y₁|</option>
+<option value="trans_32">|y₃/y₂|</option>
+<option value="trans_31">|y₃/y₁|</option>
+</select>
+</div>
+</div>
+
+<div class="matrix-section">
+<div class="matrix-title">📐 Структурная матрица системы</div>
+<div class="matrix-subtitle">Операторное представление (метод Л. Г. Шатихина)</div>
+<table class="matrix-table">
+<thead>
+<tr><th></th><th>y₁</th><th>y₂</th><th>y₃</th><th>F(t)</th></tr>
+</thead>
+<tbody>
+<tr>
+<th>y₁</th>
+<td class="diag"><span class="value" id="Q11">—</span><span class="label">Q₁₁</span></td>
+<td class="zero"><span class="value" id="R12">0</span><span class="label">R₁₂</span></td>
+<td class="zero"><span class="value" id="R13">0</span><span class="label">R₁₃</span></td>
+<td class="force"><span class="value" id="F1">—</span><span class="label">F₁</span></td>
+</tr>
+<tr>
+<th>y₂</th>
+<td class="zero"><span class="value" id="R21">0</span><span class="label">R₂₁</span></td>
+<td class="diag"><span class="value" id="Q22">—</span><span class="label">Q₂₂</span></td>
+<td class="zero"><span class="value" id="R23">0</span><span class="label">R₂₃</span></td>
+<td class="force"><span class="value" id="F2">—</span><span class="label">F₂</span></td>
+</tr>
+<tr>
+<th>y₃</th>
+<td class="zero"><span class="value" id="R31">0</span><span class="label">R₃₁</span></td>
+<td class="zero"><span class="value" id="R32">0</span><span class="label">R₃₂</span></td>
+<td class="diag"><span class="value" id="Q33">—</span><span class="label">Q₃₃</span></td>
+<td class="force"><span class="value" id="F3">—</span><span class="label">F₃</span></td>
+</tr>
+</tbody>
+</table>
+<div class="matrix-note">Qᵢᵢ — собственные операторы · Rᵢⱼ — операторы связей (знак «−» по Шатихину)</div>
+</div>
+</div>
+
+<div id="helpModal" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" id="closeHelp">✕</button>
+    <h3>📖 О проекте</h3>
+    <h4>Разработчик</h4>
+    <p><strong style="color:#4caf50;font-size:15px">Елисеев Андрей Владимирович</strong><br>
+    Соискатель, направление: методы структурного математического моделирования механических колебательных систем.</p>
+    <h4>Назначение</h4>
+    <p>Интерактивная демонстрация динамических характеристик механических систем с тремя степенями свободы (3-DOF) с применением структурных матриц (метод Л. Г. Шатихина).</p>
+    <h4>Научная основа</h4>
+    <p>В основе программы лежит <b>метод структурных матриц</b>, разработанный Л. Г. Шатихиным. Колебательная система представляется в операторной форме:</p>
+    <p style="text-align:center;color:#4caf50;font-family:monospace;font-size:12px;margin:10px 0">Q · Y = F</p>
+    <p>где <b>Q</b> — структурная матрица, содержащая на диагонали собственные операторы Qᵢᵢ = mᵢp² + Cᵢᵢp + Kᵢᵢ, а вне диагонали — операторы связей Rᵢⱼ = −(Cᵢⱼp + Kᵢⱼ). Последний столбец отражает вектор возбуждения.</p>
+    <h4>Режимы работы</h4>
+    <ul>
+      <li><b>Частотное сканирование</b> — пошаговое построение АЧХ и межпарциальных связей.</li>
+      <li><b>Свободные колебания</b> — движение от начальных условий при F=0. Позволяет наблюдать собственные моды.</li>
+      <li><b>Вынужденные колебания</b> — движение при гармонической силе F(t)=F₀sin(ωt) от нулевых НУ. Позволяет наблюдать резонанс и биения.</li>
+    </ul>
+    <div class="modal-credits">
+      <p><strong>Научная основа:</strong> Структурные матрицы и операторное представление колебательных систем — Л. Г. Шатихин.</p>
+    </div>
+    <p style="font-size:11px;color:#888;margin-top:15px;text-align:center">📧 Контакты: eavsh@ya.ru</p>
+  </div>
+</div>
+
+<div id="exportModal" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" id="closeExport">✕</button>
+    <h3>💾 Экспорт данных</h3>
+    <p>Данные содержат паспорт системы, структурную матрицу, результаты моделирования и журнал замечаний. Скопируйте в буфер обмена.</p>
+    <textarea id="exportData" readonly></textarea>
+    <div class="export-btn-row">
+      <button id="copyBtn">📋 Копировать в буфер</button>
+    </div>
+  </div>
+</div>
+
+<div id="notesModal" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" id="closeNotes">✕</button>
+    <h3>📝 Журнал замечаний</h3>
+    <div id="storageStatus"></div>
+    <p>Фиксируйте наблюдения, гипотезы и выводы во время работы.</p>
+    <textarea id="noteInput" placeholder="Введите ваше замечание..."></textarea>
+    <button id="addNoteBtn">➕ Добавить замечание</button>
+    <div id="notesList"></div>
+  </div>
+</div>
+
+<script>
+// =========================================================
+// === БЛОК 0: SPLASH SCREEN ===
+// =========================================================
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    const splash = document.getElementById('splash');
+    splash.classList.add('fade-out');
+    setTimeout(() => { splash.style.display = 'none'; }, 800);
+  }, 1500);
+});
+
+// =========================================================
+// === БЛОК 1: ПАРАМЕТРЫ СИСТЕМЫ ===
+// =========================================================
+const params = {
+  masses: { m1: 5, m2: 5, m3: 5 },
+  stiffness: { kA1: 50, kA2: 0, kA3: 0, kB1: 0, kB2: 0, kB3: 50, k12: 20, k23: 20, k13: 0 },
+  damping: { cA1: 1.0, cA2: 0, cA3: 0, cB1: 0, cB2: 0, cB3: 1.0, c12: 0, c23: 0, c13: 0 },
+  excitation: { F0: 20, forceOn: 1 },
+  scanRange: { min: 0.5, max: 30.0 },
+  visual: { trail: true, trailLen: 8, strobe: false, strobeFreq: 5.0 },
+  mode: 'scan',
+  initialConditions: { y1_0: 2, y2_0: 0, y3_0: 0, v1_0: 0, v2_0: 0, v3_0: 0 },
+  forced: { freq: 3.0, F0: 20, forceOn: 1 }
+};
+
+const state = {
+  sim: { y1:0, y2:0, y3:0, v1:0, v2:0, v3:0, t:0, fW:0.5 },
+  scan: { active:false, phase:'idle', phaseTime:0, scanW:0.5, step:0.3, mA1:0, mA2:0, mA3:0 },
+  graph: { pts1:[], pts2:[], pts3:[], ptsT:[], viewMode:'amps', currentScale:30, targetScale:30, fadeFactor:1 },
+  trail: { m1:[], m2:[], m3:[] },
+  timeHistory: { t: [], y1: [], y2: [], y3: [] },
+  timeWindow: 10,
+  running: false
+};
+
+// =========================================================
+// === БЛОК 1.5: СТРУКТУРНАЯ МАТРИЦА ===
+// =========================================================
+function getStructuralMatrixData() {
+  const { m1, m2, m3 } = params.masses;
+  const { kA1, kA2, kA3, kB1, kB2, kB3, k12, k23, k13 } = params.stiffness;
+  const { cA1, cA2, cA3, cB1, cB2, cB3, c12, c23, c13 } = params.damping;
+  const K11 = kA1 + kB1 + k12 + k13;
+  const K22 = kA2 + kB2 + k12 + k23;
+  const K33 = kA3 + kB3 + k23 + k13;
+  const C11 = cA1 + cB1 + c12 + c13;
+  const C22 = cA2 + cB2 + c12 + c23;
+  const C33 = cA3 + cB3 + c23 + c13;
+  return {
+    Q11: { m: m1, C: C11, K: K11 },
+    Q22: { m: m2, C: C22, K: K22 },
+    Q33: { m: m3, C: C33, K: K33 },
+    R12: { C: -c12, K: -k12 },
+    R13: { C: -c13, K: -k13 },
+    R23: { C: -c23, K: -k23 }
+  };
+}
+
+function updateStructuralMatrix() {
+  const sm = getStructuralMatrixData();
+  const fmt = (m, C, K) => `${m}p²+${C}p+${K}`;
+  document.getElementById('Q11').textContent = fmt(sm.Q11.m, sm.Q11.C, sm.Q11.K);
+  document.getElementById('Q22').textContent = fmt(sm.Q22.m, sm.Q22.C, sm.Q22.K);
+  document.getElementById('Q33').textContent = fmt(sm.Q33.m, sm.Q33.C, sm.Q33.K);
+  
+  const formatR = (C, K) => {
+    if (C === 0 && K === 0) return '0';
+    let s = '';
+    if (C !== 0) s += `${C}p`;
+    if (K !== 0) s += (s && K > 0 ? '+' : '') + `${K}`;
+    return s;
+  };
+  
+  const R12 = formatR(sm.R12.C, sm.R12.K);
+  const R13 = formatR(sm.R13.C, sm.R13.K);
+  const R23 = formatR(sm.R23.C, sm.R23.K);
+  
+  document.getElementById('R12').textContent = R12;
+  document.getElementById('R21').textContent = R12;
+  document.getElementById('R13').textContent = R13;
+  document.getElementById('R31').textContent = R13;
+  document.getElementById('R23').textContent = R23;
+  document.getElementById('R32').textContent = R23;
+  
+  let forceOn = 1;
+  if (params.mode === 'scan') forceOn = params.excitation.forceOn;
+  else if (params.mode === 'forced') forceOn = params.forced.forceOn;
+  else forceOn = 0;
+  
+  document.getElementById('F1').textContent = forceOn === 1 ? '-1' : '0';
+  document.getElementById('F2').textContent = forceOn === 2 ? '-1' : '0';
+  document.getElementById('F3').textContent = forceOn === 3 ? '-1' : '0';
+  
+  const setCellClass = (id, val) => {
+    const el = document.getElementById(id).parentElement;
+    if (val === '0') el.className = 'zero';
+    else if (id.startsWith('Q')) el.className = 'diag';
+    else if (id.startsWith('F')) el.className = 'force';
+    else el.className = 'link';
+  };
+  setCellClass('Q11', 'diag'); setCellClass('Q22', 'diag'); setCellClass('Q33', 'diag');
+  setCellClass('R12', R12); setCellClass('R21', R12);
+  setCellClass('R13', R13); setCellClass('R31', R13);
+  setCellClass('R23', R23); setCellClass('R32', R23);
+  setCellClass('F1', document.getElementById('F1').textContent);
+  setCellClass('F2', document.getElementById('F2').textContent);
+  setCellClass('F3', document.getElementById('F3').textContent);
+}
+
+// =========================================================
+// === БЛОК 2: ФИЗИКА ===
+// =========================================================
+function solve3x3(w) {
+  if (w < 1e-6) return { A1:0, A2:0, A3:0, T_21:0, T_32:0, T_31:0 };
+  const { m1, m2, m3 } = params.masses;
+  const { kA1, kA2, kA3, kB1, kB2, kB3, k12, k23, k13 } = params.stiffness;
+  const { cA1, cA2, cA3, cB1, cB2, cB3, c12, c23, c13 } = params.damping;
+  const { F0, forceOn } = params.excitation;
+  const K11=kA1+kB1+k12+k13, K22=kA2+kB2+k12+k23, K33=kA3+kB3+k23+k13;
+  const K12=-k12, K13=-k13, K23=-k23;
+  const C11=cA1+cB1+c12+c13, C22=cA2+cB2+c12+c23, C33=cA3+cB3+c23+c13;
+  const C12=-c12, C13=-c13, C23=-c23;
+  const Z11r=K11-w*w*m1, Z11i=w*C11;
+  const Z22r=K22-w*w*m2, Z22i=w*C22;
+  const Z33r=K33-w*w*m3, Z33i=w*C33;
+  const Z12r=K12, Z12i=w*C12;
+  const Z13r=K13, Z13i=w*C13;
+  const Z23r=K23, Z23i=w*C23;
+  const a=Z11r,b=Z11i,d=Z22r,e=Z22i,g=Z33r,h=Z33i;
+  const c12c=Z12r,f=Z12i,i13=Z13r,j=Z13i,p=Z23r,q=Z23i;
+  const Z22Z33r=d*g-e*h, Z22Z33i=d*h+e*g;
+  const Z23sq=p*p-q*q, Z23sqi=2*p*q;
+  const A1r=Z22Z33r-Z23sq, A1i=Z22Z33i-Z23sqi;
+  const Z12Z33r=c12c*g-f*h, Z12Z33i=c12c*h+f*g;
+  const Z23Z13r=p*i13-q*j, Z23Z13i=p*j+q*i13;
+  const A2r=Z12Z33r-Z23Z13r, A2i=Z12Z33i-Z23Z13i;
+  const Z12Z23r=c12c*p-f*q, Z12Z23i=c12c*q+f*p;
+  const Z22Z13r=d*i13-e*j, Z22Z13i=d*j+e*i13;
+  const A3r=Z12Z23r-Z22Z13r, A3i=Z12Z23i-Z22Z13i;
+  const DetR=a*A1r-b*A1i-c12c*A2r+f*A2i+i13*A3r-j*A3i;
+  const DetI=a*A1i+b*A1r-c12c*A2i-f*A2r+i13*A3i+j*A3r;
+  const mag2=DetR*DetR+DetI*DetI;
+  if (mag2 < 1e-12) return { A1:0, A2:0, A3:0, T_21:0, T_32:0, T_31:0 };
+  const C11r=A1r, C11i=A1i;
+  const C22r=a*g-b*h-i13*i13+j*j, C22i=a*h+b*g-2*i13*j;
+  const C33r=a*d-b*e-c12c*c12c+f*f, C33i=a*e+b*d-2*c12c*f;
+  const C12r=-(c12c*g-f*h-i13*p+j*q), C12i=-(c12c*h+f*g-i13*q-j*p);
+  const C13r=c12c*p-f*q-d*i13+e*j, C13i=c12c*q+f*p-d*j-e*i13;
+  const C23r=-(a*p-b*q-c12c*i13+f*j), C23i=-(a*q+b*p-c12c*j-f*i13);
+  let H1r=0,H1i=0,H2r=0,H2i=0,H3r=0,H3i=0;
+  if (forceOn===1) {
+    H1r=(C11r*DetR+C11i*DetI)/mag2*F0; H1i=(C11i*DetR-C11r*DetI)/mag2*F0;
+    H2r=(C12r*DetR+C12i*DetI)/mag2*F0; H2i=(C12i*DetR-C12r*DetI)/mag2*F0;
+    H3r=(C13r*DetR+C13i*DetI)/mag2*F0; H3i=(C13i*DetR-C13r*DetI)/mag2*F0;
+  } else if (forceOn===2) {
+    H1r=(C12r*DetR+C12i*DetI)/mag2*F0; H1i=(C12i*DetR-C12r*DetI)/mag2*F0;
+    H2r=(C22r*DetR+C22i*DetI)/mag2*F0; H2i=(C22i*DetR-C22r*DetI)/mag2*F0;
+    H3r=(C23r*DetR+C23i*DetI)/mag2*F0; H3i=(C23i*DetR-C23r*DetI)/mag2*F0;
+  } else {
+    H1r=(C13r*DetR+C13i*DetI)/mag2*F0; H1i=(C13i*DetR-C13r*DetI)/mag2*F0;
+    H2r=(C23r*DetR+C23i*DetI)/mag2*F0; H2i=(C23i*DetR-C23r*DetI)/mag2*F0;
+    H3r=(C33r*DetR+C33i*DetI)/mag2*F0; H3i=(C33i*DetR-C33r*DetI)/mag2*F0;
+  }
+  const A1=Math.sqrt(H1r*H1r+H1i*H1i);
+  const A2=Math.sqrt(H2r*H2r+H2i*H2i);
+  const A3=Math.sqrt(H3r*H3r+H3i*H3i);
+  const num21r=H2r/F0,num21i=H2i/F0;
+  const den21r=H1r/F0,den21i=H1i/F0;
+  const denMag2_21=den21r*den21r+den21i*den21i;
+  const T_21=Math.sqrt(Math.pow((num21r*den21r+num21i*den21i)/(denMag2_21||1e-12),2)+Math.pow((num21i*den21r-num21r*den21i)/(denMag2_21||1e-12),2));
+  const num32r=H3r/F0,num32i=H3i/F0;
+  const den32r=H2r/F0,den32i=H2i/F0;
+  const denMag2_32=den32r*den32r+den32i*den32i;
+  const T_32=Math.sqrt(Math.pow((num32r*den32r+num32i*den32i)/(denMag2_32||1e-12),2)+Math.pow((num32i*den32r-num32r*den32i)/(denMag2_32||1e-12),2));
+  const num31r=H3r/F0,num31i=H3i/F0;
+  const den31r=H1r/F0,den31i=H1i/F0;
+  const denMag2_31=den31r*den31r+den31i*den31i;
+  const T_31=Math.sqrt(Math.pow((num31r*den31r+num31i*den31i)/(denMag2_31||1e-12),2)+Math.pow((num31i*den31r-num31r*den31i)/(denMag2_31||1e-12),2));
+  return { A1, A2, A3, T_21, T_32, T_31 };
+}
+
+function integrateStep(dt) {
+  const s = state.sim;
+  const { m1, m2, m3 } = params.masses;
+  const { kA1, kA2, kA3, kB1, kB2, kB3, k12, k23, k13 } = params.stiffness;
+  const { cA1, cA2, cA3, cB1, cB2, cB3, c12, c23, c13 } = params.damping;
+  
+  let F_ext = 0, F1 = 0, F2 = 0, F3 = 0;
+  
+  if (params.mode === 'scan') {
+    const { F0, forceOn } = params.excitation;
+    F_ext = F0 * Math.sin(s.fW * s.t);
+    F1 = (forceOn===1)?F_ext:0;
+    F2 = (forceOn===2)?F_ext:0;
+    F3 = (forceOn===3)?F_ext:0;
+  } else if (params.mode === 'forced') {
+    const { F0, forceOn, freq } = params.forced;
+    F_ext = F0 * Math.sin(freq * s.t);
+    F1 = (forceOn===1)?F_ext:0;
+    F2 = (forceOn===2)?F_ext:0;
+    F3 = (forceOn===3)?F_ext:0;
+  }
+  
+  const K11=kA1+kB1+k12+k13, K22=kA2+kB2+k12+k23, K33=kA3+kB3+k23+k13;
+  const K12=-k12, K13=-k13, K23=-k23;
+  const C11=cA1+cB1+c12+c13, C22=cA2+cB2+c12+c23, C33=cA3+cB3+c23+c13;
+  const C12=-c12, C13=-c13, C23=-c23;
+  const a1=(-C11*s.v1-C12*s.v2-C13*s.v3-K11*s.y1-K12*s.y2-K13*s.y3+F1)/m1;
+  const a2=(-C12*s.v1-C22*s.v2-C23*s.v3-K12*s.y1-K22*s.y2-K23*s.y3+F2)/m2;
+  const a3=(-C13*s.v1-C23*s.v2-C33*s.v3-K13*s.y1-K23*s.y2-K33*s.y3+F3)/m3;
+  s.v1+=a1*dt; s.v2+=a2*dt; s.v3+=a3*dt;
+  s.y1+=s.v1*dt; s.y2+=s.v2*dt; s.y3+=s.v3*dt;
+  s.t+=dt;
+}
+
+// =========================================================
+// === БЛОК 3: ОТРИСОВКА ===
+// =========================================================
+const simC = document.getElementById('simCanvas');
+const grC = document.getElementById('graphCanvas');
+const simX = simC.getContext('2d');
+const grX = grC.getContext('2d');
+
+function resize() {
+  simC.width = simC.clientWidth || 300; simC.height = simC.clientHeight || 300;
+  grC.width = grC.clientWidth || 300; grC.height = grC.clientHeight || 300;
+}
+window.addEventListener('resize', resize);
+setTimeout(resize, 100);
+
+function updateTrail(xm1, ym1, xm2, ym2, xm3, ym3) {
+  if (!params.visual.trail) return;
+  state.trail.m1.push({ x: xm1, y: ym1 });
+  state.trail.m2.push({ x: xm2, y: ym2 });
+  state.trail.m3.push({ x: xm3, y: ym3 });
+  const maxLen = params.visual.trailLen;
+  if (state.trail.m1.length > maxLen) state.trail.m1.shift();
+  if (state.trail.m2.length > maxLen) state.trail.m2.shift();
+  if (state.trail.m3.length > maxLen) state.trail.m3.shift();
+}
+
+function drawSim() {
+  const W = simC.width, H = simC.height;
+  let isFlashing = true;
+  if (params.visual.strobe) {
+    const strobeOmega = params.visual.strobeFreq;
+    const strobePhase = (state.sim.t * strobeOmega) % (2 * Math.PI);
+    const flashDuration = 0.25;
+    isFlashing = (strobePhase < flashDuration) || (strobePhase > (2 * Math.PI - flashDuration));
+    simX.fillStyle = '#000000';
+    simX.fillRect(0, 0, W, H);
+    if (!isFlashing) return;
+  } else {
+    simX.fillStyle = '#222';
+    simX.fillRect(0, 0, W, H);
+  }
+
+  const eqY = H / 2;
+  const { y1, y2, y3 } = state.sim;
+  const maxDisp = Math.max(Math.abs(y1), Math.abs(y2), Math.abs(y3), 0.5);
+  state.graph.targetScale = Math.min(50, (H * 0.35) / maxDisp);
+  state.graph.currentScale += (state.graph.targetScale - state.graph.currentScale) * 0.15;
+  const sc = state.graph.currentScale * state.graph.fadeFactor;
+  const xs1 = 25, xm1 = W * 0.25, xm2 = W * 0.5, xm3 = W * 0.75, xs2 = W - 25;
+  const ym1 = eqY + y1 * sc, ym2 = eqY + y2 * sc, ym3 = eqY + y3 * sc;
+
+  updateTrail(xm1, ym1, xm2, ym2, xm3, ym3);
+
+  simX.fillStyle = '#555';
+  simX.fillRect(xs1 - 10, eqY - 40, 20, 80);
+  simX.fillRect(xs2 - 10, eqY - 40, 20, 80);
+  simX.strokeStyle = '#777'; simX.lineWidth = 1;
+  for (let i = 0; i < 8; i++) {
+    simX.beginPath(); simX.moveTo(xs1 - 10, eqY - 35 + i * 10); simX.lineTo(xs1 - 20, eqY - 45 + i * 10); simX.stroke();
+    simX.beginPath(); simX.moveTo(xs2 + 10, eqY - 35 + i * 10); simX.lineTo(xs2 + 20, eqY - 45 + i * 10); simX.stroke();
+  }
+
+  const drawLink = (x1, y1, x2, y2, param, type) => {
+    if (param === 0) return;
+    const dx = x2 - x1, dy = y2 - y1, dist = Math.hypot(dx, dy);
+    if (dist < 5) return;
+    const height = dist * 0.3;
+    const cx = (x1 + x2) / 2;
+    const cy = type === 'top' ? (y1 + y2) / 2 - height : (y1 + y2) / 2 + height;
+    simX.strokeStyle = type === 'top' ? '#4caf50' : '#2196f3';
+    simX.lineWidth = 2;
+    simX.setLineDash(type === 'top' ? [] : [4, 4]);
+    simX.beginPath(); simX.moveTo(x1, y1); simX.quadraticCurveTo(cx, cy, x2, y2); simX.stroke();
+    simX.setLineDash([]);
+  };
+  const k = params.stiffness, c = params.damping;
+  drawLink(xs1, eqY, xm1, ym1, k.kA1, 'top'); drawLink(xs1, eqY, xm1, ym1, c.cA1, 'bottom');
+  drawLink(xs1, eqY, xm2, ym2, k.kA2, 'top'); drawLink(xs1, eqY, xm2, ym2, c.cA2, 'bottom');
+  drawLink(xs1, eqY, xm3, ym3, k.kA3, 'top'); drawLink(xs1, eqY, xm3, ym3, c.cA3, 'bottom');
+  drawLink(xs2, eqY, xm1, ym1, k.kB1, 'top'); drawLink(xs2, eqY, xm1, ym1, c.cB1, 'bottom');
+  drawLink(xs2, eqY, xm2, ym2, k.kB2, 'top'); drawLink(xs2, eqY, xm2, ym2, c.cB2, 'bottom');
+  drawLink(xs2, eqY, xm3, ym3, k.kB3, 'top'); drawLink(xs2, eqY, xm3, ym3, c.cB3, 'bottom');
+  drawLink(xm1, ym1, xm2, ym2, k.k12, 'top'); drawLink(xm1, ym1, xm2, ym2, c.c12, 'bottom');
+  drawLink(xm2, ym2, xm3, ym3, k.k23, 'top'); drawLink(xm2, ym2, xm3, ym3, c.c23, 'bottom');
+  drawLink(xm1, ym1, xm3, ym3, k.k13, 'top'); drawLink(xm1, ym1, xm3, ym3, c.c13, 'bottom');
+
+  if (params.visual.trail) {
+    const drawTrailGhost = (trail, color) => {
+      for (let i = 0; i < trail.length - 1; i++) {
+        const alpha = (i + 1) / trail.length * 0.5;
+        simX.globalAlpha = alpha;
+        simX.fillStyle = color;
+        const p = trail[i];
+        simX.fillRect(p.x - 22, p.y - 18, 44, 36);
+      }
+      simX.globalAlpha = 1.0;
+    };
+    drawTrailGhost(state.trail.m1, '#2196f3');
+    drawTrailGhost(state.trail.m2, '#ff9800');
+    drawTrailGhost(state.trail.m3, '#9c27b0');
+  }
+
+  const drawMass = (x, y, label, color) => {
+    simX.fillStyle = color; simX.fillRect(x - 22, y - 18, 44, 36);
+    simX.strokeStyle = '#fff'; simX.lineWidth = 2; simX.strokeRect(x - 22, y - 18, 44, 36);
+    simX.fillStyle = '#fff'; simX.font = 'bold 12px sans-serif';
+    simX.textAlign = 'center'; simX.textBaseline = 'middle'; simX.fillText(label, x, y);
+  };
+  drawMass(xm1, ym1, 'm₁', '#2196f3');
+  drawMass(xm2, ym2, 'm₂', '#ff9800');
+  drawMass(xm3, ym3, 'm₃', '#9c27b0');
+
+  if (params.visual.strobe && isFlashing) {
+    simX.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    simX.fillRect(0, 0, W, H);
+  }
+
+  simX.fillStyle = params.visual.strobe ? '#666' : '#aaa';
+  simX.font = '10px monospace'; simX.textAlign = 'left';
+  let info;
+  if (params.visual.strobe) {
+    info = `СТРОБ: ${params.visual.strobeFreq.toFixed(1)}`;
+  } else if (params.mode === 'scan') {
+    info = `ω: ${state.scan.scanW.toFixed(1)}`;
+  } else {
+    info = `t: ${state.sim.t.toFixed(2)} с`;
+  }
+  simX.fillText(info, 10, 20);
+}
+
+function drawGraphFRF() {
+  const W = grC.width, H = grC.height;
+  grX.fillStyle = '#1a1a1a'; grX.fillRect(0, 0, W, H);
+  const M = { l: 40, r: 10, t: 10, b: 30 };
+  const pW = W - M.l - M.r, pH = H - M.t - M.b;
+  const mWmin = params.scanRange.min;
+  const mWmax = params.scanRange.max;
+  const mWrange = Math.max(mWmax - mWmin, 0.1);
+  
+  let mA = 1;
+  const steps = 50;
+  for (let i = 0; i <= steps; i++) {
+    const w = mWmin + (i / steps) * mWrange;
+    const sol = solve3x3(w);
+    if (state.graph.viewMode === 'amps') {
+      if (sol.A1 > mA) mA = sol.A1; if (sol.A2 > mA) mA = sol.A2; if (sol.A3 > mA) mA = sol.A3;
+    } else if (state.graph.viewMode === 'trans_21' && sol.T_21 > mA) mA = sol.T_21;
+    else if (state.graph.viewMode === 'trans_32' && sol.T_32 > mA) mA = sol.T_32;
+    else if (state.graph.viewMode === 'trans_31' && sol.T_31 > mA) mA = sol.T_31;
+  }
+  mA = Math.max(mA * 1.2, 1);
+  
+  grX.strokeStyle = '#888'; grX.lineWidth = 1.5;
+  grX.beginPath(); grX.moveTo(M.l, M.t); grX.lineTo(M.l, M.t + pH); grX.lineTo(M.l + pW, M.t + pH); grX.stroke();
+  
+  grX.fillStyle = '#aaa'; grX.font = '10px sans-serif'; grX.textAlign = 'center';
+  grX.fillText('ω, рад/с', M.l + pW / 2, H - 5);
+  
+  grX.save();
+  grX.translate(12, M.t + pH / 2);
+  grX.rotate(-Math.PI / 2);
+  grX.textAlign = 'center';
+  grX.fillStyle = '#aaa';
+  grX.font = '11px sans-serif';
+  if (state.graph.viewMode === 'amps') {
+    grX.fillText('Динамическая податливость, м/Н', 0, 0);
+  } else {
+    grX.fillText('Межпарциальная связь', 0, 0);
+  }
+  grX.restore();
+  
+  grX.strokeStyle = '#333'; grX.lineWidth = 1; grX.beginPath();
+  for (let i = 0; i <= 5; i++) {
+    const py = M.t + pH - (i / 5) * pH;
+    grX.moveTo(M.l, py); grX.lineTo(M.l + pW, py);
+    grX.fillStyle = '#888'; grX.textAlign = 'right';
+    grX.fillText(((i / 5) * mA).toFixed(1), M.l - 3, py + 3);
+    const px = M.l + (i / 5) * pW;
+    grX.moveTo(px, M.t + pH); grX.lineTo(px, M.t + pH + 4);
+    grX.textAlign = 'center';
+    const wLabel = mWmin + (i / 5) * mWrange;
+    grX.fillText(wLabel.toFixed(1), px, M.t + pH + 15);
+  }
+  grX.stroke();
+  
+  grX.setLineDash([5, 3]); grX.lineWidth = 2;
+  if (state.graph.viewMode === 'amps') {
+    const drawCurve = (color, getter) => {
+      grX.strokeStyle = color; grX.beginPath();
+      for (let i = 0; i <= pW; i++) {
+        const w = mWmin + (i / pW) * mWrange;
+        const val = getter(solve3x3(w));
+        const py = M.t + pH - (val / mA) * pH;
+        if (i === 0) grX.moveTo(M.l + i, py); else grX.lineTo(M.l + i, py);
+      }
+      grX.stroke();
+    };
+    drawCurve('rgba(33,150,243,0.9)', d => d.A1);
+    drawCurve('rgba(255,152,0,0.9)', d => d.A2);
+    drawCurve('rgba(156,39,176,0.9)', d => d.A3);
+  } else {
+    grX.strokeStyle = 'rgba(224,64,251,0.9)'; grX.beginPath();
+    for (let i = 0; i <= pW; i++) {
+      const w = mWmin + (i / pW) * mWrange;
+      const sol = solve3x3(w);
+      const val = state.graph.viewMode === 'trans_21' ? sol.T_21 : (state.graph.viewMode === 'trans_32' ? sol.T_32 : sol.T_31);
+      const py = M.t + pH - (val / mA) * pH;
+      if (i === 0) grX.moveTo(M.l + i, py); else grX.lineTo(M.l + i, py);
+    }
+    grX.stroke();
+  }
+  grX.setLineDash([]);
+  
+  const drawPts = (color, pts) => {
+    grX.fillStyle = color;
+    pts.forEach(p => {
+      const px = M.l + ((p.w - mWmin) / mWrange) * pW;
+      const py = M.t + pH - (p.a / mA) * pH;
+      if (px >= M.l && px <= M.l + pW) {
+        grX.beginPath(); grX.arc(px, py, 4, 0, Math.PI * 2); grX.fill();
+      }
+    });
+  };
+  if (state.graph.viewMode === 'amps') {
+    drawPts('#2196f3', state.graph.pts1);
+    drawPts('#ff9800', state.graph.pts2);
+    drawPts('#9c27b0', state.graph.pts3);
+  } else {
+    drawPts('#e040fb', state.graph.ptsT || []);
+  }
+  
+  grX.font = 'bold 11px sans-serif'; grX.textAlign = 'left';
+  let legendY = M.t + 15;
+  if (state.graph.viewMode === 'amps') {
+    grX.fillStyle = '#2196f3'; grX.fillText('● m₁', M.l + 5, legendY); legendY += 15;
+    grX.fillStyle = '#ff9800'; grX.fillText('● m₂', M.l + 5, legendY); legendY += 15;
+    grX.fillStyle = '#9c27b0'; grX.fillText('● m₃', M.l + 5, legendY);
+  } else {
+    grX.fillStyle = '#e040fb'; grX.fillText('● Передаточная ф-ция', M.l + 5, legendY);
+  }
+}
+
+function drawGraphTime() {
+  const W = grC.width, H = grC.height;
+  grX.fillStyle = '#1a1a1a'; grX.fillRect(0, 0, W, H);
+  const M = { l: 40, r: 10, t: 10, b: 30 };
+  const pW = W - M.l - M.r, pH = H - M.t - M.b;
+  
+  const hist = state.timeHistory;
+  if (hist.t.length < 2) {
+    grX.fillStyle = '#666'; grX.font = '12px sans-serif'; grX.textAlign = 'center';
+    grX.fillText('Нажмите «Старт» для начала моделирования', W/2, H/2);
+    return;
+  }
+  
+  const tMin = hist.t[0];
+  const tMax = hist.t[hist.t.length - 1];
+  const tRange = Math.max(tMax - tMin, 0.1);
+  
+  let yMax = 0.5;
+  for (let i = 0; i < hist.y1.length; i++) {
+    yMax = Math.max(yMax, Math.abs(hist.y1[i]), Math.abs(hist.y2[i]), Math.abs(hist.y3[i]));
+  }
+  yMax *= 1.2;
+  
+  grX.strokeStyle = '#888'; grX.lineWidth = 1.5;
+  grX.beginPath(); grX.moveTo(M.l, M.t); grX.lineTo(M.l, M.t + pH); grX.lineTo(M.l + pW, M.t + pH); grX.stroke();
+  
+  grX.fillStyle = '#aaa'; grX.font = '10px sans-serif'; grX.textAlign = 'center';
+  grX.fillText('t, с', M.l + pW / 2, H - 5);
+  
+  grX.save();
+  grX.translate(12, M.t + pH / 2);
+  grX.rotate(-Math.PI / 2);
+  grX.textAlign = 'center';
+  grX.fillStyle = '#aaa';
+  grX.font = '11px sans-serif';
+  grX.fillText('Перемещение y, м', 0, 0);
+  grX.restore();
+  
+  grX.strokeStyle = '#333'; grX.lineWidth = 1; grX.beginPath();
+  for (let i = 0; i <= 5; i++) {
+    const py = M.t + (i / 5) * pH;
+    grX.moveTo(M.l, py); grX.lineTo(M.l + pW, py);
+    grX.fillStyle = '#888'; grX.textAlign = 'right';
+    const yVal = yMax - (i / 5) * 2 * yMax;
+    grX.fillText(yVal.toFixed(2), M.l - 3, py + 3);
+  }
+  for (let i = 0; i <= 5; i++) {
+    const px = M.l + (i / 5) * pW;
+    grX.moveTo(px, M.t + pH); grX.lineTo(px, M.t + pH + 4);
+    grX.textAlign = 'center';
+    const tVal = tMin + (i / 5) * tRange;
+    grX.fillText(tVal.toFixed(2), px, M.t + pH + 15);
+  }
+  grX.stroke();
+  
+  const zeroY = M.t + pH / 2;
+  grX.strokeStyle = '#555'; grX.setLineDash([2, 2]);
+  grX.beginPath(); grX.moveTo(M.l, zeroY); grX.lineTo(M.l + pW, zeroY); grX.stroke();
+  grX.setLineDash([]);
+  
+  const drawTimeCurve = (color, data) => {
+    grX.strokeStyle = color; grX.lineWidth = 1.5;
+    grX.beginPath();
+    for (let i = 0; i < hist.t.length; i++) {
+      const px = M.l + ((hist.t[i] - tMin) / tRange) * pW;
+      const py = M.t + pH / 2 - (data[i] / yMax) * (pH / 2);
+      if (i === 0) grX.moveTo(px, py); else grX.lineTo(px, py);
+    }
+    grX.stroke();
+  };
+  drawTimeCurve('#2196f3', hist.y1);
+  drawTimeCurve('#ff9800', hist.y2);
+  drawTimeCurve('#9c27b0', hist.y3);
+  
+  grX.font = 'bold 11px sans-serif'; grX.textAlign = 'left';
+  let legendY = M.t + 15;
+  grX.fillStyle = '#2196f3'; grX.fillText('● y₁', M.l + 5, legendY); legendY += 15;
+  grX.fillStyle = '#ff9800'; grX.fillText('● y₂', M.l + 5, legendY); legendY += 15;
+  grX.fillStyle = '#9c27b0'; grX.fillText('● y₃', M.l + 5, legendY);
+}
+
+function drawGraph() {
+  if (params.mode === 'scan') drawGraphFRF();
+  else drawGraphTime();
+}
+
+// =========================================================
+// === БЛОК 4: ЭКСПОРТ ДАННЫХ ===
+// =========================================================
+function generateExportData() {
+  const sm = getStructuralMatrixData();
+  const result = {
+    meta: {
+      project: "3-DOF Structural Network (Shatikhin Method)",
+      author: "Eliseev Andrey Vladimirovich",
+      role: "Applicant (soiskatel)",
+      date: new Date().toISOString(),
+      description: "Data for independent verification and expertise"
+    },
+    parameters: {
+      masses: { ...params.masses },
+      stiffness: { ...params.stiffness },
+      damping: { ...params.damping },
+      mode: params.mode
+    },
+    structural_matrix: {
+      Q11: `${sm.Q11.m}p²+${sm.Q11.C}p+${sm.Q11.K}`,
+      Q22: `${sm.Q22.m}p²+${sm.Q22.C}p+${sm.Q22.K}`,
+      Q33: `${sm.Q33.m}p²+${sm.Q33.C}p+${sm.Q33.K}`,
+      R12: `${sm.R12.C}p+${sm.R12.K}`,
+      R13: `${sm.R13.C}p+${sm.R13.K}`,
+      R23: `${sm.R23.C}p+${sm.R23.K}`
+    },
+    notes: loadNotes()
+  };
+  
+  if (params.mode === 'scan') {
+    result.parameters.excitation = { ...params.excitation };
+    result.parameters.scanRange = { ...params.scanRange };
+    result.parameters.viewMode = state.graph.viewMode;
+    
+    const theoretical = [];
+    const step = Math.max((params.scanRange.max - params.scanRange.min) / 200, 0.05);
+    for (let w = params.scanRange.min; w <= params.scanRange.max; w += step) {
+      const sol = solve3x3(w);
+      theoretical.push({
+        w: +w.toFixed(3),
+        A1: +sol.A1.toFixed(6), A2: +sol.A2.toFixed(6), A3: +sol.A3.toFixed(6),
+        T_21: +sol.T_21.toFixed(6), T_32: +sol.T_32.toFixed(6), T_31: +sol.T_31.toFixed(6)
+      });
+    }
+    result.structural_matrix.F = [
+      params.excitation.forceOn === 1 ? -1 : 0,
+      params.excitation.forceOn === 2 ? -1 : 0,
+      params.excitation.forceOn === 3 ? -1 : 0
+    ];
+    result.data = {
+      theoretical: theoretical,
+      experimental: {
+        y1: state.graph.pts1, y2: state.graph.pts2, y3: state.graph.pts3,
+        transfer: state.graph.ptsT
+      }
+    };
+  } else if (params.mode === 'free') {
+    result.parameters.initialConditions = { ...params.initialConditions };
+    result.structural_matrix.F = [0, 0, 0];
+    result.data = {
+      timeHistory: {
+        t: state.timeHistory.t.map(v => +v.toFixed(4)),
+        y1: state.timeHistory.y1.map(v => +v.toFixed(6)),
+        y2: state.timeHistory.y2.map(v => +v.toFixed(6)),
+        y3: state.timeHistory.y3.map(v => +v.toFixed(6))
+      }
+    };
+  } else if (params.mode === 'forced') {
+    result.parameters.forced = { ...params.forced };
+    result.structural_matrix.F = [
+      params.forced.forceOn === 1 ? -1 : 0,
+      params.forced.forceOn === 2 ? -1 : 0,
+      params.forced.forceOn === 3 ? -1 : 0
+    ];
+    result.data = {
+      timeHistory: {
+        t: state.timeHistory.t.map(v => +v.toFixed(4)),
+        y1: state.timeHistory.y1.map(v => +v.toFixed(6)),
+        y2: state.timeHistory.y2.map(v => +v.toFixed(6)),
+        y3: state.timeHistory.y3.map(v => +v.toFixed(6))
+      }
+    };
+  }
+  
+  return result;
+}
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const data = generateExportData();
+  const jsonStr = JSON.stringify(data, null, 2);
+  document.getElementById('exportData').value = jsonStr;
+  document.getElementById('exportModal').classList.add('open');
+  document.getElementById('status').textContent = '✅ Данные готовы к экспорту';
+  setTimeout(() => {
+    if (document.getElementById('status').textContent === '✅ Данные готовы к экспорту') {
+      document.getElementById('status').textContent = 'Готов';
+    }
+  }, 3000);
+});
+
+document.getElementById('copyBtn').addEventListener('click', function() {
+  const textarea = document.getElementById('exportData');
+  textarea.select();
+  textarea.setSelectionRange(0, 99999);
+  try {
+    document.execCommand('copy');
+    this.textContent = '✅ Скопировано!';
+    setTimeout(() => { this.textContent = '📋 Копировать в буфер'; }, 2000);
+  } catch (e) {
+    this.textContent = '❌ Ошибка';
+  }
+});
+
+// =========================================================
+// === БЛОК 5: ЖУРНАЛ ЗАМЕЧАНИЙ ===
+// =========================================================
+const NOTES_STORAGE_KEY = 'shatikhin_3dof_notes_v2';
+let storageAvailable = false;
+try {
+  const testKey = '__storage_test__';
+  localStorage.setItem(testKey, '1');
+  localStorage.removeItem(testKey);
+  storageAvailable = true;
+} catch (e) { storageAvailable = false; }
+
+let memoryNotes = [];
+
+function loadNotes() {
+  if (storageAvailable) {
+    try {
+      const data = localStorage.getItem(NOTES_STORAGE_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch (e) { return memoryNotes.slice(); }
+  }
+  return memoryNotes.slice();
+}
+
+function saveNotes(notes) {
+  memoryNotes = notes.slice();
+  if (storageAvailable) {
+    try {
+      localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes));
+      return true;
+    } catch (e) { return false; }
+  }
+  return false;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function updateStorageStatus() {
+  const statusEl = document.getElementById('storageStatus');
+  if (storageAvailable) {
+    statusEl.innerHTML = '<div class="storage-ok">✅ Замечания сохраняются в браузере.</div>';
+  } else {
+    statusEl.innerHTML = '<div class="storage-warning">⚠️ Хранилище недоступно. Замечания — только в памяти сессии. Используйте «💾 Экспорт» для сохранения.</div>';
+  }
+}
+
+function renderNotes() {
+  const notes = loadNotes();
+  const list = document.getElementById('notesList');
+  updateStorageStatus();
+  
+  if (notes.length === 0) {
+    list.innerHTML = '<div class="notes-empty">Замечаний пока нет.</div>';
+    return;
+  }
+  
+  const sorted = notes.slice().sort((a, b) => b.timestamp - a.timestamp);
+  list.innerHTML = sorted.map(note => `
+    <div class="note-item" data-id="${note.id}">
+      <button class="note-delete" data-delete-id="${note.id}">✕</button>
+      <div class="note-time">${escapeHtml(note.time)}</div>
+      <div class="note-text">${escapeHtml(note.text)}</div>
+    </div>
+  `).join('');
+  
+  list.querySelectorAll('[data-delete-id]').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      deleteNote(this.getAttribute('data-delete-id'));
+    });
+  });
+}
+
+function deleteNote(id) {
+  let notes = loadNotes();
+  notes = notes.filter(n => n.id !== id);
+  saveNotes(notes);
+  renderNotes();
+}
+
+document.getElementById('addNoteBtn').addEventListener('click', () => {
+  const input = document.getElementById('noteInput');
+  const text = input.value.trim();
+  if (!text) { input.focus(); return; }
+  
+  const notes = loadNotes();
+  const now = new Date();
+  const timeStr = now.toLocaleString('ru-RU', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+  
+  notes.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+    timestamp: now.getTime(),
+    time: timeStr,
+    text: text
+  });
+  
+  saveNotes(notes);
+  input.value = '';
+  renderNotes();
+  document.getElementById('status').textContent = `📝 Замечание добавлено (${notes.length} всего)`;
+  setTimeout(() => {
+    const st = document.getElementById('status').textContent;
+    if (st.includes('Замечание')) document.getElementById('status').textContent = 'Готов';
+  }, 2500);
+});
+
+// =========================================================
+// === БЛОК 6: ПЕРЕКЛЮЧЕНИЕ РЕЖИМОВ ===
+// =========================================================
+function updateModeUI() {
+  document.getElementById('scanSettings').style.display = params.mode === 'scan' ? 'block' : 'none';
+  document.getElementById('freeSettings').style.display = params.mode === 'free' ? 'block' : 'none';
+  document.getElementById('forcedSettings').style.display = params.mode === 'forced' ? 'block' : 'none';
+  document.getElementById('scanExcitation').style.display = params.mode === 'scan' ? 'block' : 'none';
+  
+  const btn = document.getElementById('scanBtn');
+  if (params.mode === 'scan') btn.textContent = '▶ Сканировать';
+  else btn.textContent = '▶ Старт';
+  
+  updateStructuralMatrix();
+}
+
+document.getElementById('simMode').addEventListener('change', e => {
+  params.mode = e.target.value;
+  stopSimulation();
+  updateModeUI();
+});
+
+function stopSimulation() {
+  state.scan.active = false;
+  state.scan.phase = 'idle';
+  state.running = false;
+  state.sim.y1 = state.sim.y2 = state.sim.y3 = 0;
+  state.sim.v1 = state.sim.v2 = state.sim.v3 = 0;
+  state.sim.t = 0;
+  state.graph.pts1 = []; state.graph.pts2 = []; state.graph.pts3 = []; state.graph.ptsT = [];
+  state.timeHistory = { t: [], y1: [], y2: [], y3: [] };
+  state.trail.m1 = []; state.trail.m2 = []; state.trail.m3 = [];
+  state.graph.fadeFactor = 1;
+}
+
+// =========================================================
+// === БЛОК 7: ЦИКЛ ===
+// =========================================================
+let lastTime = performance.now();
+let historySampleCounter = 0;
+
+function loop(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+  const scan = state.scan;
+  const sim = state.sim;
+  
+  if (params.mode === 'scan') {
+    if (scan.active) {
+      sim.fW = scan.scanW;
+      const T = (scan.scanW > 0.1) ? (2 * Math.PI / scan.scanW) : 10;
+      const maxWait = 2.5;
+      
+      if (scan.phase === 'settle') {
+        state.graph.fadeFactor = 1;
+        integrateStep(dt);
+        scan.phaseTime += dt;
+        if (scan.phaseTime >= Math.min(T * 1, maxWait)) {
+          scan.phase = 'measure'; scan.phaseTime = 0;
+          scan.mA1 = scan.mA2 = scan.mA3 = 0;
+        }
+      } else if (scan.phase === 'measure') {
+        state.graph.fadeFactor = 1;
+        integrateStep(dt);
+        scan.phaseTime += dt;
+        if (Math.abs(sim.y1) > scan.mA1) scan.mA1 = Math.abs(sim.y1);
+        if (Math.abs(sim.y2) > scan.mA2) scan.mA2 = Math.abs(sim.y2);
+        if (Math.abs(sim.y3) > scan.mA3) scan.mA3 = Math.abs(sim.y3);
+        
+        if (scan.phaseTime >= Math.min(T, maxWait)) {
+          if (state.graph.viewMode === 'amps') {
+            state.graph.pts1.push({ w: scan.scanW, a: scan.mA1 });
+            state.graph.pts2.push({ w: scan.scanW, a: scan.mA2 });
+            state.graph.pts3.push({ w: scan.scanW, a: scan.mA3 });
+          } else if (state.graph.viewMode === 'trans_21') {
+            const ratio = (scan.mA1 > 1e-6) ? (scan.mA2 / scan.mA1) : 0;
+            state.graph.ptsT.push({ w: scan.scanW, a: ratio });
+          } else if (state.graph.viewMode === 'trans_32') {
+            const ratio = (scan.mA2 > 1e-6) ? (scan.mA3 / scan.mA2) : 0;
+            state.graph.ptsT.push({ w: scan.scanW, a: ratio });
+          } else if (state.graph.viewMode === 'trans_31') {
+            const ratio = (scan.mA1 > 1e-6) ? (scan.mA3 / scan.mA1) : 0;
+            state.graph.ptsT.push({ w: scan.scanW, a: ratio });
+          }
+          scan.phase = 'fadeout'; scan.phaseTime = 0;
+        }
+      } else if (scan.phase === 'fadeout') {
+        state.graph.fadeFactor *= 0.90;
+        scan.phaseTime += dt;
+        if (state.graph.fadeFactor < 0.05 || scan.phaseTime > 0.5) {
+          sim.y1 = sim.y2 = sim.y3 = sim.v1 = sim.v2 = sim.v3 = sim.t = 0;
+          state.graph.fadeFactor = 1;
+          state.trail.m1 = []; state.trail.m2 = []; state.trail.m3 = [];
+          scan.scanW += scan.step;
+          if (scan.scanW > params.scanRange.max) {
+            scan.active = false; scan.phase = 'idle';
+            document.getElementById('status').textContent = '✅ Готово!';
+          } else {
+            scan.phase = 'settle'; scan.phaseTime = 0;
+            scan.mA1 = scan.mA2 = scan.mA3 = 0;
+          }
+        }
+      }
+    }
+  } else {
+    if (state.running) {
+      integrateStep(dt);
+      
+      historySampleCounter++;
+      if (historySampleCounter >= 2) {
+        historySampleCounter = 0;
+        state.timeHistory.t.push(sim.t);
+        state.timeHistory.y1.push(sim.y1);
+        state.timeHistory.y2.push(sim.y2);
+        state.timeHistory.y3.push(sim.y3);
+        
+        while (state.timeHistory.t.length > 0 && 
+               state.timeHistory.t[state.timeHistory.t.length - 1] - state.timeHistory.t[0] > state.timeWindow) {
+          state.timeHistory.t.shift();
+          state.timeHistory.y1.shift();
+          state.timeHistory.y2.shift();
+          state.timeHistory.y3.shift();
+        }
+      }
+    }
+  }
+  
+  drawSim();
+  drawGraph();
+  requestAnimationFrame(loop);
+}
+
+// =========================================================
+// === БЛОК 8: ОБРАБОТЧИКИ UI ===
+// =========================================================
+document.getElementById('toggleSettings').addEventListener('click', () => {
+  document.getElementById('settingsPanel').classList.add('open');
+});
+document.getElementById('closeSettings').addEventListener('click', () => {
+  document.getElementById('settingsPanel').classList.remove('open');
+});
+
+function setupModal(openBtnId, modalId, closeBtnId) {
+  document.getElementById(openBtnId).addEventListener('click', () => {
+    document.getElementById(modalId).classList.add('open');
+  });
+  document.getElementById(closeBtnId).addEventListener('click', () => {
+    document.getElementById(modalId).classList.remove('open');
+  });
+  document.getElementById(modalId).addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('open');
+  });
+}
+setupModal('helpBtn', 'helpModal', 'closeHelp');
+setupModal('exportBtn', 'exportModal', 'closeExport');
+
+document.getElementById('notesBtn').addEventListener('click', () => {
+  document.getElementById('notesModal').classList.add('open');
+  renderNotes();
+});
+document.getElementById('closeNotes').addEventListener('click', () => {
+  document.getElementById('notesModal').classList.remove('open');
+});
+document.getElementById('notesModal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+
+document.getElementById('scanMin').addEventListener('input', e => {
+  params.scanRange.min = parseFloat(e.target.value);
+  document.getElementById('scanMinVal').textContent = params.scanRange.min.toFixed(1);
+});
+document.getElementById('scanMax').addEventListener('input', e => {
+  params.scanRange.max = parseFloat(e.target.value);
+  document.getElementById('scanMaxVal').textContent = params.scanRange.max.toFixed(1);
+});
+
+document.getElementById('trailOn').addEventListener('change', e => {
+  params.visual.trail = e.target.checked;
+  if (!params.visual.trail) { state.trail.m1 = []; state.trail.m2 = []; state.trail.m3 = []; }
+});
+document.getElementById('trailLen').addEventListener('input', e => {
+  document.getElementById('trailLenVal').textContent = e.target.value;
+  params.visual.trailLen = parseInt(e.target.value);
+});
+document.getElementById('strobeOn').addEventListener('change', e => {
+  params.visual.strobe = e.target.checked;
+});
+document.getElementById('strobeFreq').addEventListener('input', e => {
+  const val = parseFloat(e.target.value);
+  document.getElementById('strobeFreqVal').textContent = val.toFixed(1);
+  params.visual.strobeFreq = val;
+});
+
+['y1_0','y2_0','y3_0','v1_0','v2_0','v3_0'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input', e => {
+    document.getElementById(id + 'Val').textContent = parseFloat(e.target.value).toFixed(1);
+    params.initialConditions[id] = parseFloat(e.target.value);
+  });
+});
+
+document.getElementById('forcedFreq').addEventListener('input', e => {
+  const val = parseFloat(e.target.value);
+  document.getElementById('forcedFreqVal').textContent = val.toFixed(1);
+  params.forced.freq = val;
+});
+document.getElementById('F0_forced').addEventListener('input', e => {
+  const val = parseFloat(e.target.value);
+  document.getElementById('F0_forcedVal').textContent = val;
+  params.forced.F0 = val;
+});
+document.getElementById('forceOn_forced').addEventListener('change', e => {
+  params.forced.forceOn = parseInt(e.target.value);
+  updateStructuralMatrix();
+});
+
+const paramIds = ['m1','m2','m3','kA1','cA1','kA2','cA2','kA3','cA3','kB1','cB1','kB2','cB2','kB3','cB3','k12','c12','k23','c23','k13','c13','F0'];
+paramIds.forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input', e => {
+    document.getElementById(id + 'Val').textContent = e.target.value;
+    const v = parseFloat(e.target.value);
+    if (id.startsWith('m')) params.masses[id] = v;
+    else if (id.startsWith('k')) params.stiffness[id] = v;
+    else if (id.startsWith('c')) params.damping[id] = v;
+    else if (id === 'F0') params.excitation.F0 = v;
+    updateStructuralMatrix();
+  });
+});
+
+document.getElementById('forceOn').addEventListener('change', e => {
+  params.excitation.forceOn = parseInt(e.target.value);
+  updateStructuralMatrix();
+});
+document.getElementById('viewMode').addEventListener('change', e => {
+  state.graph.viewMode = e.target.value;
+  state.graph.pts1 = []; state.graph.pts2 = []; state.graph.pts3 = []; state.graph.ptsT = [];
+});
+
+document.getElementById('scanBtn').addEventListener('click', () => {
+  if (params.mode === 'scan') {
+    if (state.scan.active) return;
+    state.sim.y1 = state.sim.y2 = state.sim.y3 = 0;
+    state.sim.v1 = state.sim.v2 = state.sim.v3 = 0;
+    state.sim.t = 0;
+    state.graph.pts1 = []; state.graph.pts2 = []; state.graph.pts3 = []; state.graph.ptsT = [];
+    state.trail.m1 = []; state.trail.m2 = []; state.trail.m3 = [];
+    state.scan.scanW = params.scanRange.min;
+    state.scan.phase = 'settle';
+    state.scan.active = true;
+    document.getElementById('status').textContent = '🔄 Сканирование...';
+  } else {
+    if (state.running) {
+      state.running = false;
+      document.getElementById('scanBtn').textContent = '▶ Старт';
+      document.getElementById('status').textContent = '⏸ Остановлено';
+      return;
+    }
+    
+    if (params.mode === 'free') {
+      const ic = params.initialConditions;
+      state.sim.y1 = ic.y1_0; state.sim.y2 = ic.y2_0; state.sim.y3 = ic.y3_0;
+      state.sim.v1 = ic.v1_0; state.sim.v2 = ic.v2_0; state.sim.v3 = ic.v3_0;
+    } else {
+      state.sim.y1 = state.sim.y2 = state.sim.y3 = 0;
+      state.sim.v1 = state.sim.v2 = state.sim.v3 = 0;
+    }
+    state.sim.t = 0;
+    state.timeHistory = { t: [], y1: [], y2: [], y3: [] };
+    state.trail.m1 = []; state.trail.m2 = []; state.trail.m3 = [];
+    state.running = true;
+    document.getElementById('scanBtn').textContent = '⏸ Стоп';
+    document.getElementById('status').textContent = params.mode === 'free' ? '🌀 Свободные колебания' : '⚡ Вынужденные колебания';
+  }
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  stopSimulation();
+  document.getElementById('scanBtn').textContent = params.mode === 'scan' ? '▶ Сканировать' : '▶ Старт';
+  document.getElementById('status').textContent = 'Сброшено';
+});
+
+updateStructuralMatrix();
+updateModeUI();
+resize();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
