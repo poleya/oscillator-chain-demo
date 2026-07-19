@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Модифицированный маятник Капицы</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { background: #000; color: #e0e0e0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: #1a1a1a; border-bottom: 1px solid #333; flex-shrink: 0; }
+header h2 { font-size: 14px; color: #fff; }
+.header-actions { display: flex; gap: 8px; }
+.circle-btn { background: #2196f3; color: #fff; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.circle-btn.notes { background: #ff9800; }
+.circle-btn.help { background: #9c27b0; }
+.circle-btn.settings { background: #4caf50; width: auto; padding: 0 15px; border-radius: 20px; font-size: 13px; font-weight: bold; }
+.circle-btn.exit { background: #f44336; }
+
+.workspace { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+@media(min-width: 601px) { .workspace { flex-direction: row; } }
+canvas { flex: 1; display: block; background: #000; min-height: 0; }
+
+.controls { background: #1a1a1a; padding: 10px; border-top: 1px solid #333; flex-shrink: 0; }
+.btn-row { display: flex; gap: 8px; }
+button.action-btn { flex: 1; padding: 12px; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; color: white; cursor: pointer; }
+#startBtn { background: #4caf50; }
+#stopBtn { background: #f44336; }
+#idealBtn { background: #ff9800; }
+#recordBtn { background: #2196f3; }
+#showBtn { background: #9c27b0; }
+#scopeBtn { background: #00bcd4; }
+#polarBtn { background: #e91e63; }
+
+.status { text-align: center; font-size: 12px; color: #aaa; margin-top: 6px; }
+.footer { text-align: center; font-size: 10px; color: #555; padding: 6px; background: #0a0a0a; border-top: 1px solid #222; flex-shrink: 0; }
+
+#settingsPanel { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(10,10,10,0.98); z-index: 100; display: none; overflow-y: auto; padding: 60px 15px 20px; }
+#settingsPanel.open { display: block; }
+#closeSettings { position: fixed; top: 10px; right: 15px; z-index: 101; background: #f44336; color: #fff; border: none; border-radius: 50%; width: 44px; height: 44px; font-size: 22px; cursor: pointer; }
+
+.section-title { color: #4caf50; font-size: 13px; font-weight: bold; margin: 15px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #333; }
+.sg { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.sg label { font-size: 12px; width: 110px; color: #ccc; }
+.sg input { flex: 1; margin: 0 8px; accent-color: #4caf50; height: 28px; }
+.sg span { font-size: 12px; color: #4caf50; font-weight: bold; width: 45px; text-align: right; }
+
+.modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.95); z-index: 200; overflow-y: auto; padding: 20px; }
+.modal.open { display: block; }
+.modal-content { background: #1a1a1a; max-width: 800px; margin: 20px auto; padding: 20px; border-radius: 10px; border: 1px solid #444; position: relative; }
+.modal-close { position: absolute; top: 10px; right: 15px; background: #f44336; color: #fff; border: none; border-radius: 50%; width: 36px; height: 36px; font-size: 20px; cursor: pointer; }
+.modal-content h3 { color: #4caf50; margin-bottom: 15px; font-size: 18px; }
+.modal-content h4 { color: #2196f3; margin: 15px 0 8px 0; font-size: 14px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+.modal-content p, .modal-content ul { color: #ccc; font-size: 13px; line-height: 1.6; margin-bottom: 10px; }
+.modal-content ul { margin-left: 20px; }
+
+.polar-controls { background: #252525; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 3px solid #00bcd4; }
+.polar-controls .sg { margin-bottom: 10px; }
+
+#scopeCanvas { width: 100%; height: 280px; background: #0a0a0a; border-radius: 5px; border: 1px solid #333; margin-top: 10px; }
+#polarCanvas { width: 100%; max-width: 350px; height: 350px; background: #0a0a0a; display: block; margin: 0 auto; border-radius: 50%; }
+
+#exportData { width: 100%; height: 200px; background: #0a0a0a; color: #e0e0e0; border: 1px solid #444; border-radius: 5px; padding: 10px; font-family: monospace; font-size: 10px; resize: vertical; margin-top: 10px; }
+#copyBtn { flex: 1; background: #2196f3; color: #fff; border: none; border-radius: 5px; padding: 12px; font-size: 14px; font-weight: bold; cursor: pointer; }
+
+#noteInput { width: 100%; min-height: 80px; background: #0a0a0a; color: #e0e0e0; border: 1px solid #444; border-radius: 5px; padding: 10px; font-size: 13px; resize: vertical; }
+#addNoteBtn, #copyNotesBtn { flex: 1; background: #ff9800; color: #fff; border: none; border-radius: 5px; padding: 12px; font-size: 14px; font-weight: bold; cursor: pointer; }
+#copyNotesBtn { background: #2196f3; margin-left: 8px; }
+.notes-btn-row { display: flex; margin-top: 10px; }
+#notesList { margin-top: 15px; max-height: 300px; overflow-y: auto; }
+.note-item { background: #1e1e1e; padding: 10px; border-radius: 5px; margin-bottom: 8px; border-left: 3px solid #ff9800; position: relative; }
+.note-time { color: #888; font-size: 10px; margin-bottom: 4px; font-family: monospace; }
+.note-text { color: #e0e0e0; font-size: 12px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+.note-delete { position: absolute; top: 8px; right: 8px; background: #f44336; color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px; font-size: 14px; cursor: pointer; }
+.storage-ok { background: #0a2a0a; border: 1px solid #4caf50; border-radius: 5px; padding: 8px; margin-bottom: 12px; color: #81c784; font-size: 11px; }
+
+.energy-indicator { background: rgba(0,0,0,0.7); border: 1px solid #444; border-radius: 5px; padding: 10px; margin: 15px 0; }
+.energy-bar { background: #333; height: 14px; border-radius: 3px; margin: 8px 0; position: relative; overflow: hidden; }
+.energy-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.energy-bar-threshold { position: absolute; right: 0; top: 0; bottom: 0; width: 2px; background: #fff; }
+
+#exitConfirmModal .modal-content { max-width: 400px; text-align: center; }
+.exit-buttons { display: flex; gap: 15px; margin-top: 20px; }
+.exit-buttons button { flex: 1; padding: 15px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+#exitYes { background: #f44336; color: #fff; }
+#exitNo { background: #4caf50; color: #fff; }
+
+#exitScreen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #0a0a0a; z-index: 99999; display: none; flex-direction: column; justify-content: center; align-items: center; }
+#exitScreen.show { display: flex; animation: fadeIn 0.5s ease-in; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.exit-logo { margin-bottom: 20px; animation: pulse 1.5s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+.exit-title { color: #fff; font-size: 20px; letter-spacing: 3px; text-transform: uppercase; font-weight: bold; }
+.exit-subtitle { color: #888; font-size: 13px; margin-top: 8px; font-style: italic; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h2>Модифицированный маятник Капицы</h2>
+  <div class="header-actions">
+    <button id="notesBtn" class="circle-btn notes" title="Журнал заметок">📝</button>
+    <button id="helpBtn" class="circle-btn help" title="О проекте">?</button>
+    <button id="settingsBtn" class="circle-btn settings">⚙ Настройки</button>
+    <button id="exitBtn" class="circle-btn exit" title="Выход">✕</button>
+  </div>
+</header>
+
+<div class="workspace">
+  <canvas id="simCanvas"></canvas>
+  <canvas id="graphCanvas"></canvas>
+</div>
+
+<div class="controls">
+  <div class="btn-row">
+    <button id="startBtn" class="action-btn">▶ Старт</button>
+    <button id="stopBtn" class="action-btn">⏸ Стоп</button>
+  </div>
+  <div class="btn-row" style="margin-top:8px;">
+    <button id="idealBtn" class="action-btn">🔄 Идеальный</button>
+    <button id="scopeBtn" class="action-btn">📈 Осциллограф</button>
+    <button id="polarBtn" class="action-btn">🎯 Карта U</button>
+  </div>
+  <div class="btn-row" style="margin-top:8px;">
+    <button id="recordBtn" class="action-btn"> Запись</button>
+    <button id="showBtn" class="action-btn">💾 Экспорт</button>
+  </div>
+  <div class="status" id="status">Готов</div>
+</div>
+
+<div class="footer">© Елисеев А.В. 2026</div>
+
+<!-- SETTINGS -->
+<div id="settingsPanel">
+  <button id="closeSettings">✕</button>
+  <div class="section-title">⚡ Управление</div>
+  <div class="sg"><label>Скорость</label><input type="range" id="p_speed" min="0.1" max="5" step="0.1" value="1"><span id="v_speed">1.0x</span></div>
+  <div class="section-title">⚙️ Параметры</div>
+  <div class="sg"><label>Жёсткость k</label><input type="range" id="p_k" min="100" max="3000" step="100" value="1000"><span id="v_k">1000</span></div>
+  <div class="sg"><label>Демпфирование b</label><input type="range" id="p_b" min="0" max="5" step="0.1" value="2.0"><span id="v_b">2.0</span></div>
+  <div class="sg"><label>Частота ω</label><input type="range" id="p_omega" min="10" max="100" step="5" value="30"><span id="v_omega">30</span></div>
+  <div class="sg"><label>Амплитуда F₀</label><input type="range" id="p_F0" min="0" max="200" step="5" value="60"><span id="v_F0">60</span></div>
+  <div class="sg"><label>Длина l₀</label><input type="range" id="p_l0" min="0.3" max="0.8" step="0.05" value="0.65"><span id="v_l0">0.65</span></div>
+  <div class="section-title">🚧 Ограничители</div>
+  <div class="sg"><label>r_min</label><input type="range" id="p_rmin" min="0.1" max="0.7" step="0.05" value="0.35"><span id="v_rmin">0.35</span></div>
+  <div class="sg"><label>r_max</label><input type="range" id="p_rmax" min="0.5" max="1.2" step="0.05" value="0.85"><span id="v_rmax">0.85</span></div>
+  <div class="section-title">🎯 Начальные условия</div>
+  <div class="sg"><label>φ₀ (рад)</label><input type="range" id="p_phi0" min="-0.5" max="0.5" step="0.01" value="0.15"><span id="v_phi0">0.15</span></div>
+  <div class="sg"><label>φ̇₀ (рад/с)</label><input type="range" id="p_phidot0" min="-5" max="5" step="0.1" value="0"><span id="v_phidot0">0.0</span></div>
+</div>
+
+<!-- HELP MODAL -->
+<div id="helpModal" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="document.getElementById('helpModal').style.display='none'">✕</button>
+    <h3>📖 О проекте</h3>
+    <h4>🎯 Назначение</h4>
+    <p>Интерактивная демонстрация эффекта динамической стабилизации перевёрнутого маятника (эффект Капицы, 1951) с дополнительной упругой радиальной степенью свободы.</p>
+    <h4>🔢 Структурная матрица (метод Л. Г. Шатихина)</h4>
+    <p>В операторной форме (p = d/dt) система записывается как <b>Q · q = F</b>, где q = [φ, r]:</p>
+    <div style="background:#1e1e1e; padding:10px; border-radius:5px; margin:10px 0; border-left:3px solid #4caf50; font-size:11px; font-family:monospace; color:#ccc; overflow-x:auto;">
+      Q_φφ = mr²p² + 2mrṙp + mgr·cos(φ)<br>
+      Q_φr = 2mrφ̇p<br>
+      Q_rφ = −2mrφ̇p − mrφ̇²<br>
+      Q_rr = mp² + bp + k<br>
+      F_φ = −r·sin(φ)·F₀cos(ωt)<br>
+      F_r = −cos(φ)·F₀cos(ωt)
+    </div>
+    <p>Диагональ — собственные операторы подсистем. Вне диагонали — кориолисовы и центробежные связи.</p>
+    <h4>🌀 Эффективный потенциал</h4>
+    <p style="text-align:center; color:#4caf50; font-family:monospace; font-size:13px; margin:10px 0; padding:8px; background:#1e1e1e; border-radius:5px;">
+      U_eff(Φ) = mgr₀·cos(Φ) + F₀²/(4mω²)·sin²(Φ)
+    </p>
+    <h4>✅ Критерий Капицы</h4>
+    <p style="text-align:center; color:#4caf50; font-family:monospace; font-size:14px; margin:10px 0; padding:8px; background:#1e1e1e; border-radius:5px; border:2px solid #4caf50;">
+      F₀² > 2m²gr₀ω²
+    </p>
+    <div style="background:#1e1e1e; padding:12px; border-radius:5px; margin:15px 0; border-left:3px solid #4caf50;">
+      <p style="color:#e0e0e0; font-size:12px; margin:0; line-height:1.6;"><strong>Научная основа:</strong></p>
+      <p style="color:#e0e0e0; font-size:12px; margin:5px 0 0 0;">• Эффект динамической стабилизации — <strong>П. Л. Капица</strong> (1951, Нобелевская премия 1978)</p>
+      <p style="color:#e0e0e0; font-size:12px; margin:5px 0 0 0;">• Метод разделения движений — <strong>И. И. Блехман</strong></p>
+      <p style="color:#e0e0e0; font-size:12px; margin:5px 0 0 0;">• Структурные матрицы — <strong>Л. Г. Шатихин</strong></p>
+    </div>
+    <p style="font-size:11px; color:#888; margin-top:15px; text-align:center;">
+      <strong>Разработчик:</strong> Елисеев Андрей Владимирович<br>
+      Соискатель, направление: методы структурного математического моделирования механических колебательных систем<br>
+      📧 eavsh@ya.ru | © 2026
+    </p>
+  </div>
+</div>
+
+<!-- NOTES MODAL -->
+<div id="notesModal" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="document.getElementById('notesModal').style.display='none'">✕</button>
+    <h3>📝 Журнал заметок</h3>
+    <div id="storageStatus"></div>
+    <textarea id="noteInput" placeholder="Ваша заметка..."></textarea>
+    <div class="notes-btn-row">
+      <button id="addNoteBtn">➕ Добавить</button>
+      <button id="copyNotesBtn">📋 Копировать все</button>
+    </div>
+    <div id="notesList"></div>
+  </div>
+</div>
+
+<!-- OSCILLOSCOPE MODAL -->
+<div id="scopeModal" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="document.getElementById('scopeModal').style.display='none'">✕</button>
+    <h3>📈 Осциллограф φ(t)</h3>
+    <p style="font-size:12px; color:#888;">Красная линия = мгновенный угол φ(t). Голубая толстая = усреднённый Φ(t).</p>
+    <canvas id="scopeCanvas" width="800" height="350"></canvas>
+  </div>
+</div>
+
+<!-- POLAR MODAL -->
+<div id="polarModal" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="document.getElementById('polarModal').style.display='none'">✕</button>
+    <h3>🎯 Карта потенциала U(φ,r)</h3>
+    <canvas id="polarCanvas" width="350" height="350"></canvas>
+    <div class="polar-controls">
+      <div class="sg"><label>Масса m</label><input type="range" id="polar_m" min="0.1" max="2" step="0.1" value="0.5"><span id="polar_v_m" style="color:#00bcd4">0.5</span></div>
+      <div class="sg"><label>Частота ω</label><input type="range" id="polar_omega" min="5" max="100" step="1" value="30"><span id="polar_v_omega" style="color:#00bcd4">30</span></div>
+      <div class="sg"><label>Амплитуда F₀</label><input type="range" id="polar_F0" min="0" max="200" step="5" value="60"><span id="polar_v_F0" style="color:#00bcd4">60</span></div>
+      <div class="sg"><label>Длина l₀</label><input type="range" id="polar_l0" min="0.3" max="0.8" step="0.05" value="0.65"><span id="polar_v_l0" style="color:#00bcd4">0.65</span></div>
+    </div>
+    <div class="energy-indicator">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+        <span style="color:#ccc; font-size:12px;">E/E_barrier: <span id="energyValue">0.00</span></span>
+        <span id="energyStatus" style="font-weight:bold; font-size:12px;">✓ УСТОЙЧИВО</span>
+      </div>
+      <div class="energy-bar">
+        <div id="energyBarFill" class="energy-bar-fill" style="width:0%; background:#00ff00;"></div>
+        <div class="energy-bar-threshold"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EXIT CONFIRM MODAL -->
+<div id="exitConfirmModal" class="modal">
+  <div class="modal-content">
+    <h3>Вы хотите выйти?</h3>
+    <div class="exit-buttons">
+      <button id="exitYes">Да</button>
+      <button id="exitNo">Нет</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div id="exportModal" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="document.getElementById('exportModal').style.display='none'">✕</button>
+    <h3>💾 Экспорт данных</h3>
+    <textarea id="exportData" readonly></textarea>
+    <div class="btn-row" style="margin-top:12px;"><button id="copyBtn">📋 Копировать</button></div>
+  </div>
+</div>
+
+<!-- EXIT SCREEN -->
+<div id="exitScreen">
+  <svg class="exit-logo" width="200" height="120" viewBox="0 0 240 120">
+    <path d="M 10 35 Q 30 10, 50 35 Q 70 60, 90 35 Q 110 10, 130 35 Q 150 60, 170 35 Q 190 10, 210 35 Q 220 22, 230 35" stroke="#2196f3" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M 10 85 Q 30 60, 50 85 Q 70 110, 90 85 Q 110 60, 130 85 Q 150 110, 170 85 Q 190 60, 210 85 Q 220 72, 230 85" stroke="#4caf50" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <circle cx="120" cy="60" r="9" fill="#ff0000"><animate attributeName="r" values="8;10;8" dur="1.5s" repeatCount="infinite"/></circle>
+  </svg>
+  <div class="exit-title">механика вибраций</div>
+  <div class="exit-subtitle">в примерах</div>
+  <p style="color:#888; font-size:12px; margin-top:20px;">© Елисеев А.В. 2026</p>
+</div>
+
+<script>
+window.onload = function() {
+  try {
+    var simCanvas = document.getElementById('simCanvas');
+    var graphCanvas = document.getElementById('graphCanvas');
+    var scopeCanvas = document.getElementById('scopeCanvas');
+    var polarCanvas = document.getElementById('polarCanvas');
+    var simCtx = simCanvas.getContext('2d');
+    var graphCtx = graphCanvas.getContext('2d');
+    var scopeCtx = scopeCanvas.getContext('2d');
+    var polarCtx = polarCanvas.getContext('2d');
+
+    function resizeCanvases() {
+      var w = simCanvas.clientWidth || 300;
+      simCanvas.width = w; simCanvas.height = 200;
+      graphCanvas.width = w; graphCanvas.height = 200;
+    }
+    window.addEventListener('resize', resizeCanvases);
+    setTimeout(resizeCanvases, 100);
+
+    var P = { m: 0.5, k: 1000, b: 2.0, omega: 30, F0: 60, l0: 0.65, rMin: 0.35, rMax: 0.85, g: 9.81, epsilon: 0.001, speed: 1.0 };
+    var phi0 = 0.15, phiDot0 = 0, r0 = 0.65, rDot0 = 0;
+    var phi = 0.15, phiDot = 0, r = 0.65, rDot = 0;
+    var time = 0;
+    var started = false, paused = true;
+    var isRecording = false, recordedData = [], lastRecordTime = 0;
+    var scopeData = [];
+    var MAX_SCOPE_POINTS = 300;
+    var globalUmin = 0, globalUmax = 1;
+    var polarMapNeedsRedraw = true;
+
+    function getColorForU(U) {
+      var norm = (U - globalUmin) / (globalUmax - globalUmin || 1);
+      var r_c, g_c, b_c;
+      if (norm < 0.5) { r_c = Math.floor(norm * 2 * 255); g_c = 255; b_c = 0; }
+      else { r_c = 255; g_c = Math.floor((1 - norm) * 2 * 255); b_c = 0; }
+      return 'rgb(' + r_c + ',' + g_c + ',' + b_c + ')';
+    }
+
+    // Синхронизация параметров между настройками и картой U
+    function syncPolarToSettings() {
+      document.getElementById('p_omega').value = P.omega;
+      document.getElementById('v_omega').textContent = P.omega.toFixed(0);
+      document.getElementById('p_F0').value = P.F0;
+      document.getElementById('v_F0').textContent = P.F0.toFixed(0);
+      document.getElementById('p_l0').value = P.l0;
+      document.getElementById('v_l0').textContent = P.l0.toFixed(2);
+      document.getElementById('p_m').value = P.m;
+      document.getElementById('v_m').textContent = P.m.toFixed(1);
+    }
+
+    function syncSettingsToPolar() {
+      document.getElementById('polar_omega').value = P.omega;
+      document.getElementById('polar_v_omega').textContent = P.omega.toFixed(0);
+      document.getElementById('polar_F0').value = P.F0;
+      document.getElementById('polar_v_F0').textContent = P.F0.toFixed(0);
+      document.getElementById('polar_l0').value = P.l0;
+      document.getElementById('polar_v_l0').textContent = P.l0.toFixed(2);
+      document.getElementById('polar_m').value = P.m;
+      document.getElementById('polar_v_m').textContent = P.m.toFixed(1);
+    }
+
+    function bindParam(id, valId, paramName) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('input', function() {
+          var v = parseFloat(this.value);
+          var dec = (Math.abs(v) < 1 || v % 1 !== 0) ? 1 : 0;
+          document.getElementById(valId).textContent = v.toFixed(dec) + (id === 'p_speed' ? 'x' : '');
+          P[paramName] = v;
+          polarMapNeedsRedraw = true;
+          syncSettingsToPolar();
+        });
+      }
+    }
+
+    function setupPolarSlider(id, valId, paramName) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('input', function() {
+          var v = parseFloat(this.value);
+          document.getElementById(valId).textContent = v;
+          P[paramName] = v;
+          polarMapNeedsRedraw = true;
+          syncPolarToSettings();
+        });
+      }
+    }
+
+    bindParam('p_speed', 'v_speed', 'speed');
+    bindParam('p_k', 'v_k', 'k');
+    bindParam('p_b', 'v_b', 'b');
+    bindParam('p_omega', 'v_omega', 'omega');
+    bindParam('p_F0', 'v_F0', 'F0');
+    bindParam('p_l0', 'v_l0', 'l0');
+    bindParam('p_phi0', 'v_phi0', 'phi0');
+    
+    var phidot0El = document.getElementById('p_phidot0');
+    if (phidot0El) phidot0El.addEventListener('input', function() { phiDot0 = parseFloat(this.value); document.getElementById('v_phidot0').textContent = phiDot0.toFixed(1); });
+    
+    var rminEl = document.getElementById('p_rmin');
+    if (rminEl) rminEl.addEventListener('input', function() {
+      var v = parseFloat(this.value);
+      if (v >= P.rMax - 0.1) { v = P.rMax - 0.1; this.value = v; }
+      P.rMin = v; document.getElementById('v_rmin').textContent = v.toFixed(2); polarMapNeedsRedraw = true;
+    });
+    
+    var rmaxEl = document.getElementById('p_rmax');
+    if (rmaxEl) rmaxEl.addEventListener('input', function() {
+      var v = parseFloat(this.value);
+      if (v <= P.rMin + 0.1) { v = P.rMin + 0.1; this.value = v; }
+      P.rMax = v; document.getElementById('v_rmax').textContent = v.toFixed(2); polarMapNeedsRedraw = true;
+    });
+
+    setupPolarSlider('polar_m', 'polar_v_m', 'm');
+    setupPolarSlider('polar_omega', 'polar_v_omega', 'omega');
+    setupPolarSlider('polar_F0', 'polar_v_F0', 'F0');
+    setupPolarSlider('polar_l0', 'polar_v_l0', 'l0');
+
+    var settingsBtn = document.getElementById('settingsBtn');
+    var closeSettings = document.getElementById('closeSettings');
+    var startBtn = document.getElementById('startBtn');
+    var stopBtn = document.getElementById('stopBtn');
+    var idealBtn = document.getElementById('idealBtn');
+    var recordBtn = document.getElementById('recordBtn');
+    var showBtn = document.getElementById('showBtn');
+    var scopeBtn = document.getElementById('scopeBtn');
+    var polarBtn = document.getElementById('polarBtn');
+    var copyBtn = document.getElementById('copyBtn');
+    var notesBtn = document.getElementById('notesBtn');
+    var helpBtn = document.getElementById('helpBtn');
+    var exitBtn = document.getElementById('exitBtn');
+    var exitYes = document.getElementById('exitYes');
+    var exitNo = document.getElementById('exitNo');
+
+    if (settingsBtn) settingsBtn.addEventListener('click', function() { document.getElementById('settingsPanel').style.display = 'block'; });
+    if (closeSettings) closeSettings.addEventListener('click', function() { document.getElementById('settingsPanel').style.display = 'none'; });
+
+    if (startBtn) startBtn.addEventListener('click', function() {
+      phi = phi0; phiDot = phiDot0; r = r0; rDot = rDot0; time = 0;
+      scopeData = []; recordedData = []; isRecording = true; lastRecordTime = 0;
+      started = true; paused = false; updateRecordButton(); updateStatus(true);
+    });
+
+    if (stopBtn) stopBtn.addEventListener('click', function() {
+      paused = !paused; this.textContent = paused ? '▶ Продолжить' : '⏸ Стоп'; updateStatus(paused);
+    });
+
+    if (idealBtn) idealBtn.addEventListener('click', function() {
+      P.m=0.5; P.k=1000; P.b=2.0; P.omega=30; P.F0=60; P.l0=0.65; P.rMin=0.35; P.rMax=0.85; phi0=0.15; phiDot0=0; P.speed=0.2;
+      document.getElementById('p_k').value=1000; document.getElementById('v_k').textContent='1000';
+      document.getElementById('p_b').value=2.0; document.getElementById('v_b').textContent='2.0';
+      document.getElementById('p_omega').value=30; document.getElementById('v_omega').textContent='30';
+      document.getElementById('p_F0').value=60; document.getElementById('v_F0').textContent='60';
+      document.getElementById('p_l0').value=0.65; document.getElementById('v_l0').textContent='0.65';
+      document.getElementById('p_speed').value=0.2; document.getElementById('v_speed').textContent='0.2x';
+      document.getElementById('polar_m').value=0.5; document.getElementById('polar_v_m').textContent='0.5';
+      document.getElementById('polar_omega').value=30; document.getElementById('polar_v_omega').textContent='30';
+      document.getElementById('polar_F0').value=60; document.getElementById('polar_v_F0').textContent='60';
+      document.getElementById('polar_l0').value=0.65; document.getElementById('polar_v_l0').textContent='0.65';
+      phi = phi0; phiDot = phiDot0; r = r0; rDot = rDot0; time = 0;
+      scopeData = []; recordedData = []; isRecording = true; lastRecordTime = 0; started = true; paused = false;
+      document.getElementById('stopBtn').textContent = '⏸ Стоп'; updateRecordButton(); updateStatus(true);
+      polarMapNeedsRedraw = true;
+    });
+
+    if (recordBtn) recordBtn.addEventListener('click', function() { isRecording = !isRecording; if(isRecording) lastRecordTime = time; updateRecordButton(); });
+    
+    if (showBtn) showBtn.addEventListener('click', function() {
+      if (!recordedData.length) { alert('Нет данных. Запустите эксперимент.'); return; }
+      document.getElementById('exportData').value = JSON.stringify({ metadata: { parameters: P }, trajectory: recordedData }, null, 2);
+      document.getElementById('exportModal').style.display = 'block';
+    });
+    
+    if (copyBtn) copyBtn.addEventListener('click', function() {
+      var ta = document.getElementById('exportData'); ta.select();
+      try { document.execCommand('copy'); this.textContent = '✅ Скопировано!'; } catch (e) { this.textContent = '❌ Ошибка'; }
+    });
+    
+    if (scopeBtn) scopeBtn.addEventListener('click', function() { document.getElementById('scopeModal').style.display = 'block'; });
+    if (polarBtn) polarBtn.addEventListener('click', function() { polarMapNeedsRedraw = true; document.getElementById('polarModal').style.display = 'block'; });
+    if (notesBtn) notesBtn.addEventListener('click', function() { renderNotes(); document.getElementById('notesModal').style.display = 'block'; });
+    if (helpBtn) helpBtn.addEventListener('click', function() { document.getElementById('helpModal').style.display = 'block'; });
+    
+    if (exitBtn) exitBtn.addEventListener('click', function() { 
+      document.getElementById('exitConfirmModal').style.display = 'block'; 
+    });
+    
+    if (exitYes) exitYes.addEventListener('click', function() {
+      document.getElementById('exitConfirmModal').style.display = 'none';
+      document.getElementById('exitScreen').classList.add('show');
+    });
+    
+    if (exitNo) exitNo.addEventListener('click', function() {
+      document.getElementById('exitConfirmModal').style.display = 'none';
+    });
+
+    var modals = document.querySelectorAll('.modal');
+    for (var i = 0; i < modals.length; i++) {
+      modals[i].addEventListener('click', function(e) { if(e.target===this) this.style.display='none'; });
+    }
+
+    function updateRecordButton() {
+      var btn = document.getElementById('recordBtn');
+      if (isRecording) { btn.textContent = '⏹ Стоп (' + recordedData.length + ')'; btn.style.background = '#f44336'; }
+      else { btn.textContent = ' Запись'; btn.style.background = '#2196f3'; }
+    }
+
+    function updateStatus(isPaused) {
+      var s = document.getElementById('status');
+      var speedText = ' | Скорость: ' + P.speed.toFixed(1) + 'x';
+      if (!started) s.textContent = 'Готов' + speedText;
+      else if (isPaused) s.textContent = '⏸ Пауза' + speedText;
+      else if (Math.abs(phi) < 0.05 && Math.abs(phiDot) < 0.1 && time > 2.0) s.textContent = '✅ УСТОЙЧИВО!' + speedText;
+      else s.textContent = ' Переключение...' + speedText;
+    }
+
+    // === NOTES ===
+    var NOTES_KEY = 'kapitza_notes_v1';
+    var storageAvailable = false;
+    try { localStorage.setItem('__t', '1'); localStorage.removeItem('__t'); storageAvailable = true; } catch(e) {}
+    var memoryNotes = [];
+    function loadNotes() {
+      if (storageAvailable) { try { var data = localStorage.getItem(NOTES_KEY); return data ? JSON.parse(data) : []; } catch(e) { return memoryNotes.slice(); } }
+      return memoryNotes.slice();
+    }
+    function saveNotes(notes) { memoryNotes = notes.slice(); if (storageAvailable) try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch(e) {} }
+    function escapeHtml(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+    function renderNotes() {
+      var notes = loadNotes(); var list = document.getElementById('notesList');
+      document.getElementById('storageStatus').innerHTML = storageAvailable ? '<div class="storage-ok">✅ Сохраняется в браузере</div>' : '<div style="color:#ff9800;font-size:11px;">⚠️ Только в памяти</div>';
+      if (notes.length === 0) { list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">Пусто</div>'; return; }
+      list.innerHTML = notes.slice().sort(function(a,b){return b.timestamp-a.timestamp;}).map(function(n) {
+        return '<div class="note-item"><button class="note-delete" data-id="' + n.id + '">✕</button><div class="note-time">' + escapeHtml(n.time) + '</div><div class="note-text">' + escapeHtml(n.text) + '</div></div>';
+      }).join('');
+      var btns = list.querySelectorAll('.note-delete');
+      for (var i = 0; i < btns.length; i++) { btns[i].addEventListener('click', function() { deleteNote(this.getAttribute('data-id')); }); }
+    }
+    function deleteNote(id) { saveNotes(loadNotes().filter(function(n) { return n.id !== id; })); renderNotes(); }
+    var addNoteBtn = document.getElementById('addNoteBtn');
+    if (addNoteBtn) addNoteBtn.addEventListener('click', function() {
+      var input = document.getElementById('noteInput'); if (!input.value.trim()) return;
+      var notes = loadNotes(); var now = new Date();
+      notes.push({ id: Date.now().toString(36)+Math.random().toString(36).slice(2,8), timestamp: now.getTime(), time: now.toLocaleString('ru-RU'), text: input.value.trim() });
+      saveNotes(notes); input.value = ''; renderNotes();
+    });
+    var copyNotesBtn = document.getElementById('copyNotesBtn');
+    if (copyNotesBtn) copyNotesBtn.addEventListener('click', function() {
+      var notes = loadNotes();
+      var text = notes.map(function(n) { return n.time + '\n' + n.text; }).join('\n\n---\n\n');
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); this.textContent = '✅ Скопировано!'; } catch (e) { this.textContent = '❌ Ошибка'; }
+      document.body.removeChild(ta);
+    });
+
+    // === PHYSICS ===
+    function U_eff(phi_val, r_val) {
+      return P.m * P.g * r_val * Math.cos(phi_val) + (P.F0 * P.F0) / (4 * P.m * P.omega * P.omega) * Math.sin(phi_val) * Math.sin(phi_val);
+    }
+    function derivatives(state, t) {
+      var p = state[0], pd = state[1], rr = state[2], rd = state[3];
+      var F_vert = P.F0 * Math.cos(P.omega * t);
+      var r_ddot = rr * pd * pd - P.g * Math.cos(p) - (P.k/P.m) * (rr - P.l0) - (P.b/P.m) * rd + (F_vert / P.m) * Math.cos(p);
+      var phi_ddot = (-2 * rd * pd + P.g * Math.sin(p) - (P.b/P.m) * rr * pd - (F_vert / P.m) * Math.sin(p)) / (rr + P.epsilon);
+      return [pd, phi_ddot, rd, r_ddot];
+    }
+    function rk4Step(state, t, h) {
+      var k1 = derivatives(state, t);
+      var s2 = [state[0]+0.5*h*k1[0], state[1]+0.5*h*k1[1], state[2]+0.5*h*k1[2], state[3]+0.5*h*k1[3]];
+      var k2 = derivatives(s2, t+0.5*h);
+      var s3 = [state[0]+0.5*h*k2[0], state[1]+0.5*h*k2[1], state[2]+0.5*h*k2[2], state[3]+0.5*h*k2[3]];
+      var k3 = derivatives(s3, t+0.5*h);
+      var s4 = [state[0]+h*k3[0], state[1]+h*k3[1], state[2]+h*k3[2], state[3]+h*k3[3]];
+      var k4 = derivatives(s4, t+h);
+      return [
+        state[0] + (h/6)*(k1[0]+2*k2[0]+2*k3[0]+k4[0]),
+        state[1] + (h/6)*(k1[1]+2*k2[1]+2*k3[1]+k4[1]),
+        state[2] + (h/6)*(k1[2]+2*k2[2]+2*k3[2]+k4[2]),
+        state[3] + (h/6)*(k1[3]+2*k2[3]+2*k3[3]+k4[3])
+      ];
+    }
+    function physics(dt) {
+      if (paused || !started) return;
+      var scaledDt = dt * P.speed;
+      var N = Math.max(50, Math.ceil(P.omega * scaledDt * 5));
+      var h = scaledDt / N;
+      for (var i = 0; i < N; i++) {
+        var ns = rk4Step([phi, phiDot, r, rDot], time, h);
+        phi = ns[0]; phiDot = ns[1]; r = ns[2]; rDot = ns[3];
+        if (r < P.rMin) { r = P.rMin; rDot = 0.3 * Math.abs(rDot); }
+        if (r > P.rMax) { r = P.rMax; rDot = -0.3 * Math.abs(rDot); }
+        if (isRecording && time - lastRecordTime >= 0.02) {
+          recordedData.push({ t: time.toFixed(4), phi: phi.toFixed(4), r: r.toFixed(4) });
+          lastRecordTime = time;
+        }
+        time += h;
+      }
+      scopeData.push({ t: time, phi: phi });
+      if (scopeData.length > MAX_SCOPE_POINTS) scopeData.shift();
+    }
+
+    // === DRAWING ===
+    function drawSpring(x1, y1, x2, y2, color, coils, amplitude) {
+      var dx = x2 - x1, dy = y2 - y1;
+      var angle = Math.atan2(dy, dx), perp = angle + Math.PI / 2;
+      simCtx.strokeStyle = color; simCtx.lineWidth = 2; simCtx.beginPath(); simCtx.moveTo(x1, y1);
+      for (var i = 1; i <= coils * 2; i++) {
+        var t = i / (coils * 2 + 1);
+        var dir = (i % 2 === 1) ? 1 : -1;
+        simCtx.lineTo(x1 + dx * t + Math.cos(perp) * amplitude * dir, y1 + dy * t + Math.sin(perp) * amplitude * dir);
+      }
+      simCtx.lineTo(x2, y2); simCtx.stroke();
+    }
+    function drawArrow(fx, fy, tx, ty, color, lw, hs) {
+      var dx = tx - fx, dy = ty - fy, len = Math.sqrt(dx*dx + dy*dy);
+      if (len < 1) return;
+      var angle = Math.atan2(dy, dx);
+      simCtx.strokeStyle = color; simCtx.lineWidth = lw; simCtx.beginPath(); simCtx.moveTo(fx, fy); simCtx.lineTo(tx, ty); simCtx.stroke();
+      simCtx.fillStyle = color; simCtx.beginPath();
+      simCtx.moveTo(tx, ty);
+      simCtx.lineTo(tx - hs * Math.cos(angle - Math.PI/6), ty - hs * Math.sin(angle - Math.PI/6));
+      simCtx.lineTo(tx - hs * Math.cos(angle + Math.PI/6), ty - hs * Math.sin(angle + Math.PI/6));
+      simCtx.closePath(); simCtx.fill();
+    }
+
+    function draw() {
+      var W = simCanvas.width, H = simCanvas.height;
+      simCtx.clearRect(0, 0, W, H);
+      var cx = W * 0.5, cy = H * 0.45, scale = Math.min(W, H) * 0.35;
+      var rodEndX = cx + P.rMax * scale * Math.sin(phi), rodEndY = cy - P.rMax * scale * Math.cos(phi);
+      var mx = cx + r * scale * Math.sin(phi), my = cy - r * scale * Math.cos(phi);
+      
+      simCtx.strokeStyle = '#444'; simCtx.lineWidth = 1; simCtx.setLineDash([5, 3]);
+      simCtx.beginPath(); simCtx.moveTo(cx, 20); simCtx.lineTo(cx, H - 20); simCtx.stroke(); simCtx.setLineDash([]);
+      simCtx.fillStyle = '#888'; simCtx.font = 'italic 12px Arial'; simCtx.fillText('g ↓', cx + 5, 35);
+      simCtx.fillStyle = '#888'; simCtx.beginPath(); simCtx.arc(cx, cy, 6, 0, Math.PI*2); simCtx.fill();
+      simCtx.strokeStyle = '#2196f3'; simCtx.lineWidth = 3; simCtx.beginPath(); simCtx.moveTo(cx, cy); simCtx.lineTo(rodEndX, rodEndY); simCtx.stroke();
+      drawSpring(mx, my, rodEndX, rodEndY, '#888', 10, 5);
+      
+      simCtx.fillStyle = '#ff9800'; simCtx.fillRect(mx - 12, my - 12, 24, 24);
+      simCtx.strokeStyle = '#fff'; simCtx.lineWidth = 1; simCtx.strokeRect(mx - 12, my - 12, 24, 24);
+      
+      var F_vert = P.F0 * Math.cos(P.omega * time), arrowLen = F_vert * 1.5;
+      if (Math.abs(arrowLen) > 3) {
+        drawArrow(mx, my, mx, my - arrowLen, '#f0883e', 3, 10);
+        simCtx.fillStyle = '#f0883e'; simCtx.font = 'bold 12px Arial'; simCtx.fillText('F(t)', mx + 15, my - arrowLen / 2);
+      }
+
+      var W2 = graphCanvas.width, H2 = graphCanvas.height;
+      graphCtx.clearRect(0, 0, W2, H2);
+      graphCtx.fillStyle = '#ccc'; graphCtx.font = 'bold 11px Arial'; graphCtx.textAlign = 'center';
+      graphCtx.fillText('Потенциальная энергия U(φ)', W2 / 2, 12);
+      var pMin = -Math.PI, pMax = Math.PI, steps = 100;
+      var U_minG = Infinity, U_maxG = -Infinity, U_arr = [];
+      for (var i = 0; i <= steps; i++) {
+        var p = pMin + (pMax - pMin) * i / steps;
+        var U = U_eff(p, r);
+        U_arr.push(U);
+        if (U < U_minG) U_minG = U; if (U > U_maxG) U_maxG = U;
+      }
+      var margin = (U_maxG - U_minG) * 0.15 || 1;
+      var draw_min = U_minG - margin, draw_max = U_maxG + margin, draw_range = draw_max - draw_min;
+      var padX = 35, padTop = 20, padBottom = 30, gW = W2 - 2*padX, gH = H2 - padTop - padBottom;
+      function getY(U) { return (H2 - padBottom) - ((U - draw_min) / draw_range) * gH; }
+      
+      graphCtx.strokeStyle = '#888'; graphCtx.lineWidth = 1.5;
+      graphCtx.beginPath(); graphCtx.moveTo(padX, padTop); graphCtx.lineTo(padX, H2 - padBottom); graphCtx.lineTo(W2 - padX, H2 - padBottom); graphCtx.stroke();
+      graphCtx.strokeStyle = '#b060ff'; graphCtx.lineWidth = 3; graphCtx.beginPath();
+      for (var i = 0; i <= steps; i++) {
+        var x = padX + (i / steps) * gW;
+        if (i === 0) graphCtx.moveTo(x, getY(U_arr[i])); else graphCtx.lineTo(x, getY(U_arr[i]));
+      }
+      graphCtx.stroke();
+      
+      var displayPhi = phi;
+      while (displayPhi > Math.PI) displayPhi -= 2*Math.PI;
+      while (displayPhi < -Math.PI) displayPhi += 2*Math.PI;
+      var currentX = padX + ((displayPhi - pMin) / (pMax - pMin)) * gW;
+      var currentY = getY(U_eff(phi, r));
+      graphCtx.fillStyle = '#ff0000'; graphCtx.beginPath(); graphCtx.arc(currentX, currentY, 5, 0, 2*Math.PI); graphCtx.fill();
+    }
+
+    function drawOscilloscope() {
+      if (document.getElementById('scopeModal').style.display !== 'block') return;
+      var W = scopeCanvas.width, H = scopeCanvas.height;
+      scopeCtx.clearRect(0, 0, W, H);
+      if (scopeData.length < 2) return;
+      
+      var tMin = scopeData[0].t, tMax = scopeData[scopeData.length - 1].t;
+      var tRange = Math.max(tMax - tMin, 0.1);
+      var phiMin = Infinity, phiMax = -Infinity;
+      for (var i = 0; i < scopeData.length; i++) {
+        if (scopeData[i].phi < phiMin) phiMin = scopeData[i].phi;
+        if (scopeData[i].phi > phiMax) phiMax = scopeData[i].phi;
+      }
+      var phiAbsMax = Math.max(Math.abs(phiMin), Math.abs(phiMax), 0.1);
+      phiMin = -phiAbsMax; phiMax = phiAbsMax;
+      var phiRange = phiMax - phiMin;
+      
+      var padLeft = 60, padRight = 30, padTop = 30, padBottom = 50;
+      var gW = W - padLeft - padRight;
+      var gH = H - padTop - padBottom;
+      
+      function getX(t) { return padLeft + ((t - tMin) / tRange) * gW; }
+      function getY(p) { return padTop + gH - ((p - phiMin) / phiRange) * gH; }
+      var yZero = getY(0);
+
+      scopeCtx.fillStyle = '#0a0a0a';
+      scopeCtx.fillRect(0, 0, W, H);
+      
+      scopeCtx.strokeStyle = '#222'; scopeCtx.lineWidth = 1;
+      var tStep = Math.pow(10, Math.floor(Math.log10(tRange / 5)));
+      for (var t = Math.ceil(tMin / tStep) * tStep; t <= tMax; t += tStep) {
+        var x = getX(t);
+        scopeCtx.beginPath(); scopeCtx.moveTo(x, padTop); scopeCtx.lineTo(x, padTop + gH); scopeCtx.stroke();
+      }
+      var phiStep = Math.pow(10, Math.floor(Math.log10(phiRange / 5)));
+      for (var p = Math.ceil(phiMin / phiStep) * phiStep; p <= phiMax; p += phiStep) {
+        var y = getY(p);
+        scopeCtx.beginPath(); scopeCtx.moveTo(padLeft, y); scopeCtx.lineTo(padLeft + gW, y); scopeCtx.stroke();
+      }
+
+      scopeCtx.strokeStyle = '#666'; scopeCtx.lineWidth = 1.5;
+      scopeCtx.beginPath(); scopeCtx.moveTo(padLeft, padTop); scopeCtx.lineTo(padLeft, padTop + gH); scopeCtx.stroke();
+      scopeCtx.beginPath(); scopeCtx.moveTo(padLeft, yZero); scopeCtx.lineTo(padLeft + gW, yZero); scopeCtx.stroke();
+      scopeCtx.fillStyle = '#666';
+      scopeCtx.beginPath(); scopeCtx.moveTo(padLeft + gW + 5, yZero); scopeCtx.lineTo(padLeft + gW - 3, yZero - 4); scopeCtx.lineTo(padLeft + gW - 3, yZero + 4); scopeCtx.fill();
+      scopeCtx.beginPath(); scopeCtx.moveTo(padLeft, padTop - 5); scopeCtx.lineTo(padLeft - 4, padTop + 3); scopeCtx.lineTo(padLeft + 4, padTop + 3); scopeCtx.fill();
+
+      scopeCtx.fillStyle = '#ccc'; scopeCtx.font = 'bold 14px Arial';
+      scopeCtx.textAlign = 'center';
+      scopeCtx.fillText('t (с)', padLeft + gW / 2, H - 10);
+      scopeCtx.save();
+      scopeCtx.translate(15, padTop + gH / 2);
+      scopeCtx.rotate(-Math.PI / 2);
+      scopeCtx.fillText('φ (рад)', 0, 0);
+      scopeCtx.restore();
+
+      scopeCtx.fillStyle = '#888'; scopeCtx.font = '12px monospace'; scopeCtx.textAlign = 'center';
+      for (var t = Math.ceil(tMin / tStep) * tStep; t <= tMax; t += tStep) {
+        var x = getX(t);
+        scopeCtx.fillText(t.toFixed(1), x, padTop + gH + 20);
+      }
+      scopeCtx.textAlign = 'right';
+      for (var p = Math.ceil(phiMin / phiStep) * phiStep; p <= phiMax; p += phiStep) {
+        var y = getY(p);
+        scopeCtx.fillText(p.toFixed(2), padLeft - 10, y + 4);
+      }
+      scopeCtx.fillStyle = '#00ffff';
+      scopeCtx.fillText('0', padLeft - 10, yZero + 4);
+
+      scopeCtx.strokeStyle = '#00ffff'; scopeCtx.lineWidth = 4; scopeCtx.beginPath();
+      var windowSize = Math.max(5, Math.floor(scopeData.length / 15));
+      for (var i = 0; i < scopeData.length; i++) {
+        var sum = 0, count = 0;
+        for (var j = Math.max(0, i - windowSize); j <= Math.min(scopeData.length - 1, i + windowSize); j++) {
+          sum += scopeData[j].phi; count++;
+        }
+        if (i === 0) scopeCtx.moveTo(getX(scopeData[i].t), getY(sum/count));
+        else scopeCtx.lineTo(getX(scopeData[i].t), getY(sum/count));
+      }
+      scopeCtx.stroke();
+
+      scopeCtx.strokeStyle = '#ff0000'; scopeCtx.lineWidth = 1.5; scopeCtx.beginPath();
+      for (var i = 0; i < scopeData.length; i++) {
+        if (i === 0) scopeCtx.moveTo(getX(scopeData[i].t), getY(scopeData[i].phi));
+        else scopeCtx.lineTo(getX(scopeData[i].t), getY(scopeData[i].phi));
+      }
+      scopeCtx.stroke();
+    }
+
+    function drawPolarBackground() {
+      if (!polarMapNeedsRedraw) return;
+      var W = polarCanvas.width, H = polarCanvas.height;
+      polarCtx.clearRect(0, 0, W, H);
+      var cx = W / 2, cy = H / 2;
+      var R_max_px = Math.min(W, H) / 2 - 10;
+      var R_min_px = 30;
+      var stepsPhi = 72, stepsR = 30;
+      globalUmin = Infinity; globalUmax = -Infinity;
+      for (var i = 0; i <= stepsR; i++) {
+        var r_val = P.rMin + (P.rMax - P.rMin) * (i / stepsR);
+        for (var j = 0; j <= stepsPhi; j++) {
+          var phi_val = -Math.PI + (2 * Math.PI) * (j / stepsPhi);
+          var U = U_eff(phi_val, r_val);
+          if (U < globalUmin) globalUmin = U;
+          if (U > globalUmax) globalUmax = U;
+        }
+      }
+      
+      polarCtx.save();
+      polarCtx.beginPath();
+      polarCtx.arc(cx, cy, R_max_px + 5, 0, Math.PI * 2);
+      polarCtx.clip();
+      
+      polarCtx.fillStyle = '#0a0a0a';
+      polarCtx.fillRect(0, 0, W, H);
+      
+      for (var i = 0; i < stepsR; i++) {
+        var r1 = P.rMin + (P.rMax - P.rMin) * (i / stepsR);
+        var r2 = P.rMin + (P.rMax - P.rMin) * ((i + 1) / stepsR);
+        var R1 = R_min_px + (R_max_px - R_min_px) * (i / stepsR);
+        var R2 = R_min_px + (R_max_px - R_min_px) * ((i + 1) / stepsR);
+        for (var j = 0; j < stepsPhi; j++) {
+          var phi1 = -Math.PI + (2 * Math.PI) * (j / stepsPhi);
+          var phi2 = -Math.PI + (2 * Math.PI) * ((j + 1) / stepsPhi);
+          var U = U_eff((phi1 + phi2) / 2, (r1 + r2) / 2);
+          polarCtx.fillStyle = getColorForU(U);
+          polarCtx.beginPath();
+          var theta1 = phi1 - Math.PI / 2, theta2 = phi2 - Math.PI / 2;
+          polarCtx.moveTo(cx + R1 * Math.cos(theta1), cy + R1 * Math.sin(theta1));
+          polarCtx.arc(cx, cy, R2, theta1, theta2, false);
+          polarCtx.lineTo(cx + R1 * Math.cos(theta2), cy + R1 * Math.sin(theta2));
+          polarCtx.closePath();
+          polarCtx.fill();
+        }
+      }
+      
+      polarCtx.strokeStyle = 'rgba(255,255,255,0.3)'; polarCtx.lineWidth = 1;
+      polarCtx.beginPath(); polarCtx.arc(cx, cy, R_min_px, 0, Math.PI*2); polarCtx.stroke();
+      polarCtx.beginPath(); polarCtx.arc(cx, cy, R_max_px, 0, Math.PI*2); polarCtx.stroke();
+      
+      polarCtx.restore();
+      
+      polarCtx.fillStyle = '#ccc'; polarCtx.font = '11px Arial'; polarCtx.textAlign = 'center';
+      polarCtx.fillText('φ = 0 (верх)', cx, cy - R_max_px - 15);
+      polarCtx.fillText('φ = ±π (низ)', cx, cy + R_max_px + 20);
+      polarCtx.textAlign = 'right'; polarCtx.font = '10px Arial';
+      polarCtx.fillText('r=' + P.rMin.toFixed(2), cx - 8, cy - R_min_px + 4);
+      polarCtx.fillText('r=' + P.rMax.toFixed(2), cx - 8, cy - R_max_px + 4);
+
+      polarMapNeedsRedraw = false;
+    }
+
+    function drawPolarDynamic() {
+      // Полная перерисовка для удаления следов
+      drawPolarBackground();
+      
+      var W = polarCanvas.width, H = polarCanvas.height;
+      var cx = W / 2, cy = H / 2;
+      var R_max_px = Math.min(W, H) / 2 - 10;
+      var R_min_px = 30;
+      var displayPhi = phi;
+      while (displayPhi > Math.PI) displayPhi -= 2*Math.PI;
+      while (displayPhi < -Math.PI) displayPhi += 2*Math.PI;
+      var currentR_px = R_min_px + (R_max_px - R_min_px) * ((r - P.rMin) / (P.rMax - P.rMin));
+      var currentTheta = displayPhi - Math.PI / 2;
+      var px = cx + currentR_px * Math.cos(currentTheta);
+      var py = cy + currentR_px * Math.sin(currentTheta);
+      
+      polarCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      polarCtx.beginPath(); polarCtx.arc(px, py, 10, 0, 2 * Math.PI); polarCtx.fill();
+      polarCtx.fillStyle = '#ff0000';
+      polarCtx.beginPath(); polarCtx.arc(px, py, 5, 0, 2 * Math.PI); polarCtx.fill();
+      polarCtx.strokeStyle = '#fff'; polarCtx.lineWidth = 2; polarCtx.stroke();
+      
+      var E_kin = 0.5 * P.m * r * r * phiDot * phiDot;
+      var E_pot = U_eff(phi, r);
+      var E_total = E_kin + E_pot;
+      var U_bottom = U_eff(0, r);
+      var U_saddle = U_eff(Math.PI / 2, r);
+      var U_barrier = U_saddle - U_bottom;
+      var E_rel = (E_total - U_bottom) / (U_barrier > 0.001 ? U_barrier : 0.001);
+      
+      document.getElementById('energyValue').textContent = E_rel.toFixed(2);
+      var statusEl = document.getElementById('energyStatus');
+      var barFill = document.getElementById('energyBarFill');
+      if (E_rel < 0.7) {
+        statusEl.textContent = '✓ УСТОЙЧИВО';
+        statusEl.style.color = '#00ff00';
+        barFill.style.background = '#00ff00';
+      } else if (E_rel < 0.95) {
+        statusEl.textContent = '⚠ ПОГРАНИЧНО';
+        statusEl.style.color = '#ffff00';
+        barFill.style.background = '#ffff00';
+      } else {
+        statusEl.textContent = '✗ ВЫЛЕТ!';
+        statusEl.style.color = '#ff0000';
+        barFill.style.background = '#ff0000';
+      }
+      barFill.style.width = Math.min(Math.max(E_rel * 100, 0), 100) + '%';
+    }
+
+    function loop() {
+      physics(0.016);
+      draw();
+      drawOscilloscope();
+      if (document.getElementById('polarModal').style.display === 'block') {
+        drawPolarDynamic();
+      }
+      requestAnimationFrame(loop);
+    }
+
+    resizeCanvases();
+    draw();
+    loop();
+    
+    console.log('Программа успешно загружена!');
+  } catch (e) {
+    console.error('Ошибка при загрузке:', e);
+    alert('Ошибка: ' + e.message);
+  }
+};
+</script>
+</body>
+</html>
