@@ -1,0 +1,2181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Модель удочки - вертикальные колебания массы</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { background: #000; color: #e0e0e0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+#splash, #exitScreen {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: #0a0a0a; z-index: 99999;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  transition: opacity 0.8s ease-out;
+}
+#splash.fade-out, #exitScreen.fade-in { opacity: 1; }
+#splash.fade-out { opacity: 0; pointer-events: none; }
+#exitScreen { display: none; opacity: 0; }
+#exitScreen.show { display: flex; opacity: 1; }
+.splash-logo { margin-bottom: 20px; animation: pulse 1.5s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+.splash-title { color: #fff; font-size: 20px; letter-spacing: 3px; text-transform: uppercase; font-weight: bold; }
+.splash-subtitle { color: #888; font-size: 13px; margin-top: 8px; font-style: italic; letter-spacing: 1px; }
+
+header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: #1a1a1a; border-bottom: 1px solid #333; flex-shrink: 0; }
+header h2 { font-size: 14px; color: #fff; }
+.header-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.circle-btn { background: #2196f3; color: #fff; border: none; border-radius: 50%; width: 38px; height: 38px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.circle-btn.notes { background: #ff9800; }
+.circle-btn.library { background: #3f51b5; }
+.circle-btn.about { background: #9c27b0; }
+.circle-btn.exit { background: #f44336; font-weight: bold; font-size: 22px; }
+.circle-btn.settings { background: #4caf50; width: auto; padding: 0 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+.circle-btn.spectrum { background: #00bcd4; width: auto; padding: 0 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+.circle-btn.critical { background: #673ab7; width: auto; padding: 0 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+
+.workspace { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+@media(min-width: 601px) { .workspace { flex-direction: row; } }
+canvas { flex: 1; display: block; background: #000; min-height: 0; width: 100%; }
+
+.controls { background: #1a1a1a; padding: 10px; border-top: 1px solid #333; flex-shrink: 0; }
+.btn-row { display: flex; gap: 8px; }
+button.action-btn { flex: 1; padding: 12px; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; color: white; cursor: pointer; }
+#startBtn { background: #4caf50; }
+#stopBtn { background: #f44336; }
+#idealBtn { background: #ff9800; }
+#recordEffectBtn { background: #e91e63; }
+#stopRecordBtn { background: #757575; }
+#saveEffectBtn { background: #673ab7; }
+.action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.recording-pulse { animation: recPulse 1s infinite; }
+@keyframes recPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+.status { text-align: center; font-size: 12px; color: #aaa; margin-top: 6px; }
+.footer { text-align: center; font-size: 10px; color: #555; padding: 6px; background: #0a0a0a; border-top: 1px solid #222; flex-shrink: 0; }
+
+#settingsPanel { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(10,10,10,0.98); z-index: 100; display: none; overflow-y: auto; padding: 60px 15px 20px; }
+#settingsPanel.open { display: block; }
+#closeSettings { position: fixed; top: 10px; right: 15px; z-index: 101; background: #f44336; color: #fff; border: none; border-radius: 50%; width: 44px; height: 44px; font-size: 22px; cursor: pointer; }
+
+.section-title { color: #4caf50; font-size: 13px; font-weight: bold; margin: 15px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #333; }
+.sg { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.sg label { font-size: 12px; width: 110px; color: #ccc; }
+.sg input[type="range"] { flex: 1; margin: 0 8px; accent-color: #4caf50; height: 28px; }
+.sg span { font-size: 12px; color: #4caf50; font-weight: bold; width: 45px; text-align: right; }
+
+.checkbox-row { display: flex; align-items: center; margin: 10px 0; padding: 8px; background: #1e1e1e; border-radius: 5px; }
+.checkbox-row input[type="checkbox"] { width: 20px; height: 20px; margin-right: 10px; accent-color: #4caf50; }
+.checkbox-row label { font-size: 12px; color: #ccc; cursor: pointer; }
+
+.preset-btn { flex: 1; padding: 8px; border: 1px solid #444; background: #252525; color: #ccc; border-radius: 5px; font-size: 11px; cursor: pointer; margin: 2px; }
+.preset-btn.active { background: #4caf50; color: #fff; border-color: #4caf50; }
+.preset-btn-row { display: flex; margin: 10px 0; }
+
+.info-box { background: #1e1e1e; padding: 10px; border-radius: 5px; margin: 10px 0; border-left: 3px solid #2196f3; font-size: 11px; color: #ccc; line-height: 1.5; }
+
+.modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.95); z-index: 200; overflow-y: auto; padding: 20px; }
+.modal.open { display: block; }
+.modal-content { background: #1a1a1a; max-width: 900px; margin: 20px auto; padding: 20px; border-radius: 10px; border: 1px solid #444; position: relative; }
+.modal-close { position: absolute; top: 10px; right: 15px; background: #f44336; color: #fff; border: none; border-radius: 50%; width: 36px; height: 36px; font-size: 20px; cursor: pointer; }
+.modal-content h3 { color: #4caf50; margin-bottom: 15px; font-size: 18px; }
+.modal-content h4 { color: #2196f3; margin: 15px 0 8px 0; font-size: 14px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+.modal-content p, .modal-content ul { color: #ccc; font-size: 13px; line-height: 1.6; margin-bottom: 10px; }
+.modal-content ul { margin-left: 20px; }
+
+.confirm-modal .modal-content { max-width: 400px; text-align: center; }
+.confirm-buttons { display: flex; gap: 15px; margin-top: 20px; }
+.confirm-buttons button { flex: 1; padding: 15px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; color: #fff; }
+.confirm-yes { background: #f44336; }
+.confirm-no { background: #4caf50; }
+
+.about-credits { background: #1e1e1e; padding: 12px; border-radius: 5px; margin: 15px 0; border-left: 3px solid #4caf50; }
+.about-credits p { color: #e0e0e0; font-size: 12px; margin: 5px 0; line-height: 1.6; }
+.about-logo-container { text-align: center; margin: 15px 0 20px 0; padding: 15px; background: #0a0a0a; border-radius: 8px; border: 1px solid #333; }
+.about-developer { background: #1e1e1e; padding: 12px; border-radius: 5px; margin: 15px 0; border-left: 3px solid #ff9800; }
+
+.zone-indicator { padding: 15px; border-radius: 8px; margin: 15px 0; border: 2px solid; font-weight: bold; text-align: center; font-size: 14px; }
+.zone-safe { background: rgba(76, 175, 80, 0.2); border-color: #4caf50; color: #4caf50; }
+.zone-warning { background: rgba(255, 152, 0, 0.2); border-color: #ff9800; color: #ff9800; }
+.zone-danger { background: rgba(244, 67, 54, 0.2); border-color: #f44336; color: #f44336; }
+
+.critical-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12px; }
+.critical-table th { background: #333; color: #4caf50; padding: 8px; text-align: left; border: 1px solid #444; }
+.critical-table td { padding: 8px; border: 1px solid #444; color: #ccc; }
+.critical-table tr:nth-child(even) { background: #1e1e1e; }
+.critical-table .value { color: #00bcd4; font-weight: bold; font-family: monospace; }
+.critical-table .formula { color: #888; font-family: monospace; font-size: 11px; }
+
+.spectrum-bar { 
+  position: relative; height: 40px; background: linear-gradient(to right, 
+    #4caf50 0%, #4caf50 15%, #f44336 15%, #f44336 30%, 
+    #4caf50 30%, #4caf50 55%, #ff9800 55%, #ff9800 65%, 
+    #f44336 65%, #f44336 75%, #4caf50 75%, #4caf50 100%
+  ); border-radius: 5px; margin: 15px 0; border: 1px solid #444;
+}
+.spectrum-marker { position: absolute; top: -5px; bottom: -5px; width: 3px; background: #fff; border: 1px solid #000; }
+.spectrum-label { font-size: 10px; color: #888; display: flex; justify-content: space-between; margin-top: 5px; }
+
+.limit-hit-indicator { 
+  position: fixed; 
+  bottom: 100px; 
+  right: 15px;
+  background: rgba(244, 67, 54, 0.75); 
+  color: #fff; 
+  padding: 8px 14px;
+  border-radius: 6px; 
+  font-weight: bold; 
+  font-size: 12px;
+  pointer-events: none; 
+  opacity: 0; 
+  transition: opacity 0.3s;
+  z-index: 300;
+  max-width: 200px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+.limit-hit-indicator.show { opacity: 1; }
+
+#noteInput { width: 100%; min-height: 80px; background: #0a0a0a; color: #e0e0e0; border: 1px solid #444; border-radius: 5px; padding: 10px; font-size: 13px; resize: vertical; }
+#addNoteBtn, #copyNotesBtn { flex: 1; background: #ff9800; color: #fff; border: none; border-radius: 5px; padding: 12px; font-size: 14px; font-weight: bold; cursor: pointer; }
+#copyNotesBtn { background: #2196f3; margin-left: 8px; }
+.notes-btn-row { display: flex; margin-top: 10px; }
+#notesList { margin-top: 15px; max-height: 300px; overflow-y: auto; }
+.note-item { background: #1e1e1e; padding: 10px; border-radius: 5px; margin-bottom: 8px; border-left: 3px solid #ff9800; position: relative; }
+.note-time { color: #888; font-size: 10px; margin-bottom: 4px; font-family: monospace; }
+.note-text { color: #e0e0e0; font-size: 12px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+.note-delete { position: absolute; top: 8px; right: 8px; background: #f44336; color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px; font-size: 14px; cursor: pointer; }
+.storage-ok { background: #0a2a0a; border: 1px solid #4caf50; border-radius: 5px; padding: 8px; margin-bottom: 12px; color: #81c784; font-size: 11px; }
+
+#effectNameInput, #effectDescInput { 
+  width: 100%; background: #0a0a0a; color: #e0e0e0; 
+  border: 1px solid #444; border-radius: 5px; padding: 10px; 
+  font-size: 13px; margin-bottom: 10px;
+}
+#effectDescInput { min-height: 80px; resize: vertical; }
+#saveEffectOkBtn { 
+  width: 100%; background: #4caf50; color: #fff; border: none; 
+  border-radius: 5px; padding: 12px; font-size: 14px; font-weight: bold; cursor: pointer;
+}
+
+.effect-item { 
+  background: #1e1e1e; padding: 12px; border-radius: 5px; 
+  margin-bottom: 10px; border-left: 3px solid #3f51b5; position: relative;
+}
+.effect-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.effect-name { color: #00bcd4; font-weight: bold; font-size: 14px; }
+.effect-classification { color: #ff9800; font-size: 11px; font-style: italic; margin-bottom: 5px; }
+.effect-time { color: #888; font-size: 10px; font-family: monospace; }
+.effect-desc { color: #e0e0e0; font-size: 12px; line-height: 1.4; margin-bottom: 8px; }
+.effect-params { 
+  background: #0a0a0a; padding: 6px; border-radius: 3px; 
+  font-family: monospace; font-size: 10px; color: #888; 
+  margin-bottom: 8px; max-height: 80px; overflow-y: auto;
+}
+.effect-actions { display: flex; gap: 6px; }
+.effect-btn { 
+  flex: 1; padding: 8px; border: none; border-radius: 3px; 
+  font-size: 11px; font-weight: bold; cursor: pointer; color: #fff;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.effect-btn-copy { background: #2196f3; }
+.effect-btn-load { background: #4caf50; }
+.effect-btn-delete { background: #f44336; }
+.effect-btn:active { opacity: 0.7; }
+
+.empty-library { color: #666; text-align: center; padding: 30px; font-size: 13px; }
+
+/* === ИСПРАВЛЕНИЕ: Сжатый график спектра === */
+#spectrumCanvas { 
+  width: 100%; max-width: 800px; height: 280px; 
+  background: #0a0a0a; border: 1px solid #333; 
+  border-radius: 5px; margin: 15px auto; display: block;
+}
+.spectrum-info { 
+  background: #1e1e1e; padding: 10px; border-radius: 5px; 
+  margin: 10px 0; font-size: 12px;
+}
+.peak-item {
+  background: #252525; padding: 8px; border-radius: 3px;
+  margin: 5px 0; border-left: 3px solid #00bcd4;
+  font-family: monospace; font-size: 11px;
+}
+.peak-frequency { color: #00bcd4; font-weight: bold; }
+.peak-amplitude { color: #4caf50; }
+.peak-ratio { color: #ff9800; margin-left: 10px; }
+.spectrum-controls { display: flex; gap: 10px; margin: 15px 0; }
+.spectrum-controls button {
+  flex: 1; padding: 10px; border: none; border-radius: 5px;
+  font-size: 13px; font-weight: bold; cursor: pointer;
+}
+.spectrum-controls button.active { background: #00bcd4; color: #fff; }
+.spectrum-controls button.inactive { background: #333; color: #ccc; }
+
+.rotation-info {
+  background: #1e1e1e; padding: 15px; border-radius: 5px;
+  margin: 15px 0; border-left: 3px solid #ff9800;
+}
+.rotation-value {
+  font-size: 24px; font-weight: bold; color: #ff9800;
+  margin: 10px 0;
+}
+.rotation-detail {
+  font-size: 12px; color: #ccc; margin: 5px 0;
+}
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <svg class="splash-logo" width="200" height="120" viewBox="0 0 240 120">
+    <path d="M 10 35 Q 30 10, 50 35 Q 70 60, 90 35 Q 110 10, 130 35 Q 150 60, 170 35 Q 190 10, 210 35 Q 220 22, 230 35" stroke="#2196f3" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M 10 85 Q 30 60, 50 85 Q 70 110, 90 85 Q 110 60, 130 85 Q 150 110, 170 85 Q 190 60, 210 85 Q 220 72, 230 85" stroke="#4caf50" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <circle cx="120" cy="60" r="9" fill="#ff0000"><animate attributeName="r" values="8;10;8" dur="1.5s" repeatCount="infinite"/></circle>
+  </svg>
+  <div class="splash-title">механика вибраций</div>
+  <div class="splash-subtitle">модель удочки</div>
+</div>
+
+<div id="exitScreen">
+  <svg class="splash-logo" width="200" height="120" viewBox="0 0 240 120">
+    <path d="M 10 35 Q 30 10, 50 35 Q 70 60, 90 35 Q 110 10, 130 35 Q 150 60, 170 35 Q 190 10, 210 35 Q 220 22, 230 35" stroke="#2196f3" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M 10 85 Q 30 60, 50 85 Q 70 110, 90 85 Q 110 60, 130 85 Q 150 110, 170 85 Q 190 60, 210 85 Q 220 72, 230 85" stroke="#4caf50" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <circle cx="120" cy="60" r="9" fill="#ff0000"><animate attributeName="r" values="8;10;8" dur="1.5s" repeatCount="infinite"/></circle>
+  </svg>
+  <div class="splash-title">механика вибраций</div>
+  <div class="splash-subtitle">модель удочки</div>
+  <p style="color:#888; font-size:12px; margin-top:20px;">© Елисеев А.В. 2026 | eavsh@ya.ru</p>
+  <p style="color:#666; font-size:11px; margin-top:10px; font-style:italic;">Спасибо за работу с программой</p>
+</div>
+
+<header>
+  <h2>Модель удочки</h2>
+  <div class="header-actions">
+    <button id="aboutBtn" class="circle-btn about" title="О проекте">?</button>
+    <button id="notesBtn" class="circle-btn notes" title="Журнал заметок">📝</button>
+    <button id="libraryBtn" class="circle-btn library" title="Библиотека эффектов">📚</button>
+    <button id="spectrumBtn" class="circle-btn spectrum">📊 Спектр</button>
+    <button id="criticalBtn" class="circle-btn critical">📈 Критические</button>
+    <button id="settingsBtn" class="circle-btn settings">⚙ Настройки</button>
+    <!-- ИСПРАВЛЕНИЕ: белый косой крестик -->
+    <button id="exitBtn" class="circle-btn exit" title="Выход">✕</button>
+  </div>
+</header>
+
+<div class="workspace">
+  <canvas id="simCanvas"></canvas>
+  <canvas id="phiDotCanvas"></canvas>
+  <canvas id="graphCanvas"></canvas>
+</div>
+
+<div class="controls">
+  <div class="btn-row">
+    <button id="startBtn" class="action-btn">▶ Старт</button>
+    <button id="stopBtn" class="action-btn">⏸ Стоп</button>
+  </div>
+  <div class="btn-row" style="margin-top:8px;">
+    <button id="idealBtn" class="action-btn">🔄 Идеальный</button>
+  </div>
+  <div class="btn-row" style="margin-top:8px;">
+    <button id="recordEffectBtn" class="action-btn">⏺ Запись эффекта</button>
+    <button id="stopRecordBtn" class="action-btn" disabled>⏹ Стоп запись</button>
+    <button id="saveEffectBtn" class="action-btn" disabled>💾 Сохранить</button>
+  </div>
+  <div class="status" id="status">Готов</div>
+</div>
+
+<div class="footer">© Елисеев А.В. 2026 | eavsh@ya.ru</div>
+
+<div id="limitHitIndicator" class="limit-hit-indicator">⚠ УПОР</div>
+
+<div id="settingsPanel">
+  <button id="closeSettings">✕</button>
+  <div class="section-title">⚡ Управление</div>
+  <div class="sg"><label>Скорость</label><input type="range" id="p_speed" min="0.1" max="5" step="0.1" value="0.3"><span id="v_speed">0.3x</span></div>
+  <div class="section-title">⚙️ Параметры</div>
+  <div class="sg"><label>Масса m</label><input type="range" id="p_m" min="0.1" max="2" step="0.1" value="0.5"><span id="v_m">0.5</span></div>
+  <div class="sg"><label>Жёсткость k</label><input type="range" id="p_k" min="100" max="3000" step="100" value="500"><span id="v_k">500</span></div>
+  <div class="sg"><label>Демпфирование b</label><input type="range" id="p_b" min="0" max="10" step="0.5" value="5.0"><span id="v_b">5.0</span></div>
+  <div class="sg"><label>Частота ω</label><input type="range" id="p_omega" min="5" max="100" step="1" value="30"><span id="v_omega">30</span></div>
+  <div class="sg"><label>Амплитуда F₀</label><input type="range" id="p_F0" min="0" max="200" step="5" value="40"><span id="v_F0">40</span></div>
+  <div class="sg"><label>Длина L</label><input type="range" id="p_L" min="0.3" max="1.0" step="0.05" value="0.65"><span id="v_L">0.65</span></div>
+  
+  <div class="section-title">🚧 Ограничители движения y</div>
+  <div class="checkbox-row">
+    <input type="checkbox" id="enableLimits" checked>
+    <label for="enableLimits">Включить ограничители</label>
+  </div>
+  <div class="preset-btn-row">
+    <button class="preset-btn" id="presetNone">Без ограничений</button>
+    <button class="preset-btn active" id="presetSymmetric">Симметричные</button>
+    <button class="preset-btn" id="presetBottomOnly">Только снизу</button>
+    <button class="preset-btn" id="presetCustom">Свои</button>
+  </div>
+  <div class="sg"><label>y_min (м)</label><input type="range" id="p_ymin" min="-0.5" max="0.2" step="0.01" value="-0.3"><span id="v_ymin">-0.30</span></div>
+  <div class="sg"><label>y_max (м)</label><input type="range" id="p_ymax" min="-0.2" max="0.5" step="0.01" value="0.3"><span id="v_ymax">0.30</span></div>
+  
+  <div class="section-title">🎯 Начальные условия</div>
+  <div class="sg"><label>φ₀ (рад)</label><input type="range" id="p_phi0" min="-0.3" max="0.3" step="0.01" value="0.1"><span id="v_phi0">0.1</span></div>
+  <div class="sg"><label>y₀ (м)</label><input type="range" id="p_y0" min="-0.2" max="0.2" step="0.01" value="0"><span id="v_y0">0.0</span></div>
+</div>
+
+<!-- === ABOUT MODAL === -->
+<div id="aboutModal" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="document.getElementById('aboutModal').style.display='none'">✕</button>
+    
+    <div class="about-logo-container">
+      <svg width="200" height="80" viewBox="0 0 240 100">
+        <path d="M 10 30 Q 30 10, 50 30 Q 70 50, 90 30 Q 110 10, 130 30 Q 150 50, 170 30 Q 190 10, 210 30 Q 220 20, 230 30" stroke="#2196f3" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <path d="M 10 70 Q 30 50, 50 70 Q 70 90, 90 70 Q 110 50, 130 70 Q 150 90, 170 70 Q 190 50, 210 70 Q 220 60, 230 70" stroke="#4caf50" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <circle cx="120" cy="50" r="8" fill="#ff0000">
+          <animate attributeName="r" values="7;9;7" dur="1.5s" repeatCount="infinite"/>
+        </circle>
+      </svg>
+      <div style="color:#fff; font-size:16px; margin-top:10px; letter-spacing:2px; font-weight:bold;">МЕХАНИКА ВИБРАЦИЙ</div>
+      <div style="color:#888; font-size:12px; font-style:italic;">в примерах</div>
+    </div>
+    
+    <h3>📖 О проекте</h3>
+    
+    <!-- ИСПРАВЛЕНИЕ: Сначала описание проекта, затем всё остальное -->
+    <h4>🎯 Назначение программы</h4>
+    <p>Интерактивная демонстрация <b>модели "удочки"</b> — модификации классического маятника Капицы, в которой масса закреплена на конце стержня через упругую пружину и совершает вертикальные колебания. Программа предназначена для:</p>
+    <ul>
+      <li>Визуализации параметрического возбуждения колебаний</li>
+      <li>Исследования влияния параметров системы (m, ω, F₀, k, L) на динамику</li>
+      <li>Демонстрации синхронных и субгармонических режимов вращения</li>
+      <li>Верификации аналитических результатов методом численного моделирования</li>
+      <li>Систематизации обнаруженных динамических эффектов в библиотеке</li>
+    </ul>
+    
+    <h4>⚙️ Физическая постановка задачи</h4>
+    <p>Система состоит из <b>стержня</b> длины L, вращающегося вокруг неподвижного шарнира, и <b>массы m</b>, закреплённой на конце стержня через <b>упругую пружину</b> жёсткостью k. К массе приложена высокочастотная вертикальная вибрация:</p>
+    <p style="text-align:center; color:#4caf50; font-family:monospace; font-size:14px; margin:10px 0;">
+      F(t) = F₀·cos(ω·t)
+    </p>
+    <p>Обобщённые координаты системы:</p>
+    <ul>
+      <li><b>φ</b> — угол отклонения стержня от вертикали</li>
+      <li><b>y</b> — вертикальное смещение массы относительно точки крепления</li>
+    </ul>
+    
+    <h4>📐 Уравнения движения (Лагранж II рода)</h4>
+    <p>Функция Лагранжа L = T − U, где кинетическая и потенциальная энергии:</p>
+    <p style="text-align:center; color:#4caf50; font-family:monospace; font-size:13px; margin:8px 0;">
+      T = ½m(ẏ² + L²φ̇² + 2L·sin(φ)·φ̇·ẏ)<br>
+      U = −mgL·cos(φ) + mgy + ½ky²
+    </p>
+    <p>Уравнения движения с обобщёнными силами от вибрации:</p>
+    <p style="text-align:center; color:#4caf50; font-family:monospace; font-size:12px; margin:8px 0; line-height:1.8;">
+      L·φ̈ + sin(φ)·ÿ + g·sin(φ) = 0<br>
+      m·L·sin(φ)·φ̈ + m·ÿ + b·ẏ + k·y + mg = F₀·cos(ωt) + m·L·cos(φ)·φ̇²
+    </p>
+    
+    <h4>🔢 Структурная матрица (метод Л. Г. Шатихина)</h4>
+    <p>В операторной форме (p = d/dt) система записывается как <b>A·x = b</b>, где x = [φ̈, ÿ]ᵀ:</p>
+    <div style="background:#1e1e1e; padding:10px; border-radius:5px; margin:10px 0; font-size:11px; font-family:monospace; color:#ccc; overflow-x:auto;">
+      [L,           sin(φ)] [φ̈]   [-g·sin(φ)                                              ]<br>
+      [m·L·sin(φ),  m     ] [ÿ] = [F₀·cos(ωt) - mg - ky - bẏ - m·L·cos(φ)·φ̇²]
+    </div>
+    
+    <h4>🎮 Как пользоваться программой</h4>
+    <ul>
+      <li><b>▶ Старт</b> — запуск симуляции с текущими начальными условиями</li>
+      <li><b>⏸ Стоп</b> — пауза / продолжение</li>
+      <li><b>🔄 Идеальный</b> — сброс к параметрам по умолчанию</li>
+      <li><b>⏺ Запись эффекта</b> — запись траектории для сохранения в библиотеку</li>
+      <li><b>💾 Сохранить</b> — сохранение записанного эффекта с описанием</li>
+      <li><b>📚 Библиотека</b> — просмотр, загрузка и удаление сохранённых эффектов</li>
+      <li><b>📊 Спектр</b> — спектральный анализ колебаний (DFT)</li>
+      <li><b>📈 Критические</b> — критические частоты и зоны работы системы</li>
+      <li><b>⚙ Настройки</b> — параметры системы, ограничители, начальные условия</li>
+      <li><b>📝 Заметки</b> — журнал научных наблюдений</li>
+    </ul>
+    
+    <div class="about-credits">
+      <p><strong>Научная основа:</strong></p>
+      <p style="margin:5px 0 0 0;">• Эффект динамической стабилизации — <strong>П. Л. Капица</strong> (1951, Нобелевская премия 1978)</p>
+      <p style="margin:5px 0 0 0;">• Метод разделения движений — <strong>И. И. Блехман</strong></p>
+      <p style="margin:5px 0 0 0;">• Структурные матрицы колебательных систем — <strong>Л. Г. Шатихин</strong></p>
+      <p style="margin:5px 0 0 0;">• Теория параметрических колебаний — <strong>Н. Н. Боголюбов, Ю. А. Митропольский</strong></p>
+      <p style="color:#888; font-size:11px; margin-top:8px; font-style:italic;">Интеллектуальная поддержка: AI-ассистент Qwen (Alibaba Cloud).</p>
+    </div>
+    
+    <!-- ИСПРАВЛЕНИЕ: Разработчик перенесён вниз описания -->
+    <div class="about-developer">
+      <h4 style="color:#ff9800; border:none; margin-top:0;">👨‍🔬 Разработчик</h4>
+      <p style="margin:5px 0;"><strong style="color:#4caf50;font-size:15px">Елисеев Андрей Владимирович</strong></p>
+      <p style="margin:5px 0;">Соискатель, направление: <em>методы структурного математического моделирования механических колебательных систем</em>.</p>
+      <p style="margin:10px 0 0 0; font-size:11px; color:#888;">
+        📧 Контакты: eavsh@ya.ru<br>
+        © Елисеев А. В., 2026. Все права защищены.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- === EXIT CONFIRM MODAL === -->
+<div id="exitConfirmModal" class="modal confirm-modal">
+  <div class="modal-content">
+    <h3>⚠️ Выход из программы</h3>
+    <p style="color:#ccc; font-size:14px; margin:15px 0;">Вы действительно хотите выйти?</p>
+    <p style="color:#888; font-size:12px; margin-bottom:10px;">Несохранённые данные записи эффекта будут потеряны.</p>
+    <div class="confirm-buttons">
+      <button id="exitYesBtn" class="confirm-yes">Да, выйти</button>
+      <button id="exitNoBtn" class="confirm-no">Нет, остаться</button>
+    </div>
+  </div>
+</div>
+
+<div id="notesModal" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="document.getElementById('notesModal').style.display='none'">✕</button>
+    <h3>📝 Журнал заметок</h3>
+    <div id="storageStatus"></div>
+    <textarea id="noteInput" placeholder="Ваша идея, наблюдение, гипотеза..."></textarea>
+    <div class="notes-btn-row">
+      <button id="addNoteBtn">➕ Добавить</button>
+      <button id="copyNotesBtn">📋 Копировать все</button>
+    </div>
+    <div id="notesList"></div>
+  </div>
+</div>
+
+<div id="libraryModal" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="document.getElementById('libraryModal').style.display='none'">✕</button>
+    <h3>📚 Библиотека динамических эффектов</h3>
+    <div id="libraryStorageStatus"></div>
+    <div class="info-box">
+      <b>Что хранится в библиотеке:</b><br>
+      • Название, описание и автоматическая классификация эффекта<br>
+      • Полные уравнения движения (Лагранж II рода)<br>
+      • Метод численного решения (RK4) с параметрами<br>
+      • Все параметры системы с единицами измерения<br>
+      • Начальные и граничные условия<br>
+      • Данные для верификации<br>
+      • Критические частоты и зона работы<br>
+      • Инструкция по воспроизведению<br>
+      • Запись траектории (t, y, φ, φ̇)
+    </div>
+    <div id="libraryList"></div>
+  </div>
+</div>
+
+<div id="saveEffectModal" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="document.getElementById('saveEffectModal').style.display='none'">✕</button>
+    <h3>💾 Сохранить динамический эффект</h3>
+    <div id="effectRecordInfo" class="info-box"></div>
+    <label style="color:#ccc; font-size:12px; display:block; margin-bottom:5px;">Название эффекта:</label>
+    <input type="text" id="effectNameInput" placeholder="Например: Субгармоническое вращение при ω ≈ ω₀">
+    <label style="color:#ccc; font-size:12px; display:block; margin-bottom:5px;">Описание эффекта:</label>
+    <textarea id="effectDescInput" placeholder="Опишите особенности наблюдаемого эффекта, гипотезы, выводы..."></textarea>
+    <button id="saveEffectOkBtn">✅ Сохранить в библиотеку</button>
+  </div>
+</div>
+
+<div id="spectrumModal" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="document.getElementById('spectrumModal').style.display='none'">✕</button>
+    <h3>📊 Спектральный анализ колебаний</h3>
+    
+    <div class="spectrum-controls">
+      <button id="analyzeY" class="active">y(t) - вертикальные</button>
+      <button id="analyzePhi" class="inactive">φ(t) - угловые</button>
+      <button id="analyzePhiDot" class="inactive">φ̇(t) - угл. скорость</button>
+    </div>
+    
+    <div class="info-box">
+      <b>Анализ:</b> Дискретное преобразование Фурье (DFT)<br>
+      <b>Длительность записи:</b> <span id="spectrumDuration">—</span><br>
+      <b>Количество точек:</b> <span id="spectrumPoints">—</span><br>
+      <b>Частота дискретизации:</b> <span id="spectrumFs">—</span> Гц
+    </div>
+    
+    <canvas id="spectrumCanvas" width="800" height="280"></canvas>
+    
+    <div class="spectrum-info">
+      <h4 style="color:#00bcd4; margin-bottom:10px;">Доминирующие частоты:</h4>
+      <div id="peaksList"></div>
+    </div>
+    
+    <div class="rotation-info">
+      <h4 style="color:#ff9800; margin-bottom:10px;">🔄 Частота вращения кривошипа:</h4>
+      <div class="rotation-value" id="rotationFrequency">—</div>
+      <div class="rotation-detail">Угловая скорость ω<sub>rot</sub>: <span id="rotationOmega">—</span> рад/с</div>
+      <div class="rotation-detail">Период вращения T: <span id="rotationPeriod">—</span> с</div>
+      <div class="rotation-detail">Отношение ω<sub>rot</sub>/ω: <span id="rotationRatio">—</span></div>
+      <div class="rotation-detail" id="rotationStatus" style="margin-top:10px; font-weight:bold;"></div>
+    </div>
+    
+    <div class="info-box">
+      <b>Интерпретация:</b><br>
+      • Пики на частоте ω = <span id="driveFreq">—</span> рад/с — вынуждающая сила<br>
+      • Пики на ω₀ = <span id="naturalFreq">—</span> рад/с — собственная частота пружины<br>
+      • Пики на ω_φ = <span id="pendulumFreq">—</span> рад/с — частота маятника<br>
+      • Субгармоники (ω/2, ω/3...) — нелинейные эффекты<br>
+      • Комбинационные частоты — параметрическое взаимодействие
+    </div>
+  </div>
+</div>
+
+<div id="criticalModal" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="document.getElementById('criticalModal').style.display='none'">✕</button>
+    <h3>📊 Критические параметры системы</h3>
+    <div id="zoneIndicator" class="zone-indicator zone-safe">ЗОНА: ЗАГРУЗКА...</div>
+    <h4 style="color:#2196f3; margin:15px 0 8px 0; font-size:14px;">Спектр частот</h4>
+    <div class="spectrum-bar">
+      <div id="markerOmega" class="spectrum-marker" style="left: 50%;"></div>
+    </div>
+    <div class="spectrum-label">
+      <span>5 рад/с</span><span>25</span><span>50</span><span>75</span><span>100 рад/с</span>
+    </div>
+    <h4 style="color:#2196f3; margin:15px 0 8px 0; font-size:14px;">Критические частоты</h4>
+    <table class="critical-table">
+      <tr><th>Параметр</th><th>Значение</th><th>Формула</th></tr>
+      <tr><td>ω₀ (собств. пружины)</td><td class="value" id="crit_omega0">—</td><td class="formula">√(k/m)</td></tr>
+      <tr><td>ω_res (резонанс)</td><td class="value" id="crit_omega_res">—</td><td class="formula">√(ω₀² - b²/(2m²))</td></tr>
+      <tr><td>ω_anti (анти-резонанс)</td><td class="value" id="crit_omega_anti">—</td><td class="formula">ω₀/√2</td></tr>
+      <tr><td>ω_φ (маятник)</td><td class="value" id="crit_omega_phi">—</td><td class="formula">√(g/L)</td></tr>
+      <tr><td>2ω_φ (зона Матье)</td><td class="value" id="crit_2omega_phi">—</td><td class="formula">2·√(g/L)</td></tr>
+      <tr><td>b_crit (демпфирование)</td><td class="value" id="crit_b_crit">—</td><td class="formula">2·√(km)</td></tr>
+      <tr><td>ζ (коэф. демпфирования)</td><td class="value" id="crit_zeta">—</td><td class="formula">b/b_crit</td></tr>
+    </table>
+    <h4 style="color:#2196f3; margin:15px 0 8px 0; font-size:14px;">Текущие параметры</h4>
+    <table class="critical-table">
+      <tr><td>Текущая ω</td><td class="value" id="crit_current_omega">—</td><td class="formula">—</td></tr>
+      <tr><td>Отношение ω/ω₀</td><td class="value" id="crit_ratio">—</td><td class="formula">—</td></tr>
+      <tr><td>Эффективная жёсткость</td><td class="value" id="crit_k_eff">—</td><td class="formula">k + F₀²/(2mω²)</td></tr>
+      <tr><td>Теор. амплитуда резонанса</td><td class="value" id="crit_A_max">—</td><td class="formula">F₀/(b·ω_res)</td></tr>
+    </table>
+  </div>
+</div>
+
+<script>
+window.onload = function() {
+  try {
+    setTimeout(function() {
+      document.getElementById('splash').classList.add('fade-out');
+      setTimeout(function() { 
+        document.getElementById('splash').style.display = 'none'; 
+      }, 800);
+    }, 1500);
+
+    var simCanvas = document.getElementById('simCanvas');
+    var phiDotCanvas = document.getElementById('phiDotCanvas');
+    var graphCanvas = document.getElementById('graphCanvas');
+    var simCtx = simCanvas.getContext('2d');
+    var phiDotCtx = phiDotCanvas.getContext('2d');
+    var graphCtx = graphCanvas.getContext('2d');
+
+    function resizeCanvases() {
+      var w = simCanvas.clientWidth;
+      if (w < 100) w = 300;
+      simCanvas.width = w;
+      simCanvas.height = 240;
+      phiDotCanvas.width = w;
+      phiDotCanvas.height = 200;
+      graphCanvas.width = w;
+      graphCanvas.height = 200;
+    }
+    
+    window.addEventListener('resize', resizeCanvases);
+    resizeCanvases();
+
+    var P = { 
+      m: 0.5, k: 500, b: 5.0, omega: 30, F0: 40, L: 0.65, 
+      g: 9.81, speed: 0.3, 
+      yMin: -0.3, yMax: 0.3, 
+      enableLimits: true
+    };
+    var phi0 = 0.1, y0 = 0;
+    var phi = 0.1, phiDot = 0, y = 0, yDot = 0;
+    var time = 0;
+    var started = false, paused = true;
+    var yHistory = [];
+    var limitHitTime = 0;
+    var limitHitSide = 0;
+    
+    var isRecordingEffect = false;
+    var effectTrajectory = [];
+    var effectRecordStartTime = 0;
+    var lastSavedEffect = null;
+    
+    var phiAtRecordStart = 0;
+    var phiDotAtRecordStart = 0;
+    var yAtRecordStart = 0;
+    var yDotAtRecordStart = 0;
+
+    function bindParam(id, valId, paramName) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('input', function() {
+          var v = parseFloat(this.value);
+          var dec = (Math.abs(v) < 1 || v % 1 !== 0) ? 2 : 0;
+          document.getElementById(valId).textContent = v.toFixed(dec) + (id === 'p_speed' ? 'x' : '');
+          P[paramName] = v;
+          if (typeof updateCriticalDisplay === 'function') updateCriticalDisplay();
+        });
+      }
+    }
+
+    bindParam('p_speed', 'v_speed', 'speed');
+    bindParam('p_m', 'v_m', 'm');
+    bindParam('p_k', 'v_k', 'k');
+    bindParam('p_b', 'v_b', 'b');
+    bindParam('p_omega', 'v_omega', 'omega');
+    bindParam('p_F0', 'v_F0', 'F0');
+    bindParam('p_L', 'v_L', 'L');
+    bindParam('p_phi0', 'v_phi0', 'phi0');
+    bindParam('p_ymin', 'v_ymin', 'yMin');
+    bindParam('p_ymax', 'v_ymax', 'yMax');
+    
+    var y0El = document.getElementById('p_y0');
+    if (y0El) y0El.addEventListener('input', function() { y0 = parseFloat(this.value); document.getElementById('v_y0').textContent = y0.toFixed(2); });
+    
+    var enableLimitsEl = document.getElementById('enableLimits');
+    if (enableLimitsEl) {
+      enableLimitsEl.addEventListener('change', function() {
+        P.enableLimits = this.checked;
+      });
+    }
+    
+    function setActivePreset(id) {
+      var btns = document.querySelectorAll('.preset-btn');
+      for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+      document.getElementById(id).classList.add('active');
+    }
+    
+    var presetNone = document.getElementById('presetNone');
+    if (presetNone) presetNone.addEventListener('click', function() {
+      P.yMin = -0.5; P.yMax = 0.5;
+      P.enableLimits = false;
+      document.getElementById('enableLimits').checked = false;
+      document.getElementById('p_ymin').value = P.yMin;
+      document.getElementById('p_ymax').value = P.yMax;
+      document.getElementById('v_ymin').textContent = P.yMin.toFixed(2);
+      document.getElementById('v_ymax').textContent = P.yMax.toFixed(2);
+      setActivePreset('presetNone');
+    });
+    
+    var presetSymmetric = document.getElementById('presetSymmetric');
+    if (presetSymmetric) presetSymmetric.addEventListener('click', function() {
+      P.yMin = -0.3; P.yMax = 0.3;
+      P.enableLimits = true;
+      document.getElementById('enableLimits').checked = true;
+      document.getElementById('p_ymin').value = P.yMin;
+      document.getElementById('p_ymax').value = P.yMax;
+      document.getElementById('v_ymin').textContent = P.yMin.toFixed(2);
+      document.getElementById('v_ymax').textContent = P.yMax.toFixed(2);
+      setActivePreset('presetSymmetric');
+    });
+    
+    var presetBottomOnly = document.getElementById('presetBottomOnly');
+    if (presetBottomOnly) presetBottomOnly.addEventListener('click', function() {
+      P.yMin = 0; P.yMax = 0.5;
+      P.enableLimits = true;
+      document.getElementById('enableLimits').checked = true;
+      document.getElementById('p_ymin').value = P.yMin;
+      document.getElementById('p_ymax').value = P.yMax;
+      document.getElementById('v_ymin').textContent = P.yMin.toFixed(2);
+      document.getElementById('v_ymax').textContent = P.yMax.toFixed(2);
+      setActivePreset('presetBottomOnly');
+    });
+    
+    var presetCustom = document.getElementById('presetCustom');
+    if (presetCustom) presetCustom.addEventListener('click', function() {
+      P.enableLimits = true;
+      document.getElementById('enableLimits').checked = true;
+      setActivePreset('presetCustom');
+    });
+
+    document.getElementById('settingsBtn').addEventListener('click', function() { document.getElementById('settingsPanel').style.display = 'block'; });
+    document.getElementById('closeSettings').addEventListener('click', function() { document.getElementById('settingsPanel').style.display = 'none'; });
+    document.getElementById('criticalBtn').addEventListener('click', function() { 
+      updateCriticalDisplay();
+      document.getElementById('criticalModal').style.display = 'block'; 
+    });
+    
+    document.getElementById('notesBtn').addEventListener('click', function() { 
+      renderNotes();
+      document.getElementById('notesModal').style.display = 'block'; 
+    });
+    
+    document.getElementById('libraryBtn').addEventListener('click', function() { 
+      renderLibrary();
+      document.getElementById('libraryModal').style.display = 'block'; 
+    });
+    
+    document.getElementById('spectrumBtn').addEventListener('click', function() {
+      if (yHistory.length < 50) {
+        alert('Недостаточно данных для спектрального анализа.');
+        return;
+      }
+      analyzeSpectrum();
+      document.getElementById('spectrumModal').style.display = 'block';
+    });
+    
+    document.getElementById('aboutBtn').addEventListener('click', function() {
+      document.getElementById('aboutModal').style.display = 'block';
+    });
+    
+    document.getElementById('exitBtn').addEventListener('click', function() {
+      document.getElementById('exitConfirmModal').style.display = 'block';
+    });
+    
+    document.getElementById('exitYesBtn').addEventListener('click', function() {
+      document.getElementById('exitConfirmModal').style.display = 'none';
+      paused = true;
+      document.getElementById('exitScreen').classList.add('show');
+    });
+    
+    document.getElementById('exitNoBtn').addEventListener('click', function() {
+      document.getElementById('exitConfirmModal').style.display = 'none';
+    });
+
+    var recordEffectBtn = document.getElementById('recordEffectBtn');
+    var stopRecordBtn = document.getElementById('stopRecordBtn');
+    var saveEffectBtn = document.getElementById('saveEffectBtn');
+    
+    recordEffectBtn.addEventListener('click', function() {
+      if (!started) {
+        alert('Сначала запустите симуляцию');
+        return;
+      }
+      isRecordingEffect = true;
+      effectTrajectory = [];
+      effectRecordStartTime = time;
+      
+      phiAtRecordStart = phi;
+      phiDotAtRecordStart = phiDot;
+      yAtRecordStart = y;
+      yDotAtRecordStart = yDot;
+      
+      recordEffectBtn.disabled = true;
+      recordEffectBtn.classList.add('recording-pulse');
+      stopRecordBtn.disabled = false;
+      saveEffectBtn.disabled = true;
+      updateStatus(paused);
+    });
+    
+    stopRecordBtn.addEventListener('click', function() {
+      isRecordingEffect = false;
+      recordEffectBtn.disabled = false;
+      recordEffectBtn.classList.remove('recording-pulse');
+      stopRecordBtn.disabled = true;
+      if (effectTrajectory.length > 10) {
+        saveEffectBtn.disabled = false;
+        lastSavedEffect = {
+          trajectory: effectTrajectory.slice(),
+          parameters: JSON.parse(JSON.stringify(P)),
+          initialConditions: { phi0: phi0, y0: y0 },
+          startTime: effectRecordStartTime,
+          endTime: time,
+          duration: time - effectRecordStartTime,
+          historySnapshot: yHistory.slice(),
+          phiAtStart: phiAtRecordStart,
+          phiDotAtStart: phiDotAtRecordStart,
+          yAtStart: yAtRecordStart,
+          yDotAtStart: yDotAtRecordStart,
+          phiAtEnd: phi,
+          phiDotAtEnd: phiDot,
+          yAtEnd: y,
+          yDotAtEnd: yDot
+        };
+      } else {
+        saveEffectBtn.disabled = true;
+        alert('Запись слишком короткая.');
+      }
+      updateStatus(paused);
+    });
+    
+    saveEffectBtn.addEventListener('click', function() {
+      if (!lastSavedEffect) return;
+      var crit = computeCriticalParams();
+      var zoneInfo = determineZone(P.omega, crit);
+      var info = document.getElementById('effectRecordInfo');
+      info.innerHTML = '<b>Запись готова к сохранению:</b><br>' +
+        '• Длительность: ' + lastSavedEffect.duration.toFixed(2) + ' с<br>' +
+        '• Точек траектории: ' + lastSavedEffect.trajectory.length + '<br>' +
+        '• Зона системы: <span style="color:' + zoneInfo.color + ';">' + zoneInfo.name + '</span><br>' +
+        '• ω/ω₀ = ' + (P.omega / crit.omega0).toFixed(3);
+      document.getElementById('effectNameInput').value = '';
+      document.getElementById('effectDescInput').value = '';
+      document.getElementById('saveEffectModal').style.display = 'block';
+    });
+    
+    document.getElementById('saveEffectOkBtn').addEventListener('click', function() {
+      var name = document.getElementById('effectNameInput').value.trim();
+      var desc = document.getElementById('effectDescInput').value.trim();
+      if (!name) { alert('Введите название эффекта'); return; }
+      if (!desc) { alert('Введите описание эффекта'); return; }
+      
+      var crit = computeCriticalParams();
+      var zoneInfo = determineZone(P.omega, crit);
+      
+      var equations = {
+        description: 'Система нелинейных дифференциальных уравнений второго порядка, полученная из функции Лагранжа L = T - U с учётом обобщённых сил.',
+        lagrangian: {
+          kinetic: 'T = ½m(ẏ² + L²φ̇² + 2L·sin(φ)·φ̇·ẏ)',
+          potential: 'U = -mgL·cos(φ) + mgy + ½ky²',
+          dissipative: 'R = ½b·ẏ²'
+        },
+        equations: [
+          'Угловое уравнение:',
+          'L·φ̈ + sin(φ)·ÿ + g·sin(φ) = 0',
+          '',
+          'Радиальное уравнение:',
+          'm·L·sin(φ)·φ̈ + m·ÿ + b·ẏ + k·y + mg = F₀·cos(ω·t) + m·L·cos(φ)·φ̇²',
+          '',
+          'В матричной форме A·x = b:',
+          '[L,           sin(φ)] [φ̈]   [-g·sin(φ)                                              ]',
+          '[m·L·sin(φ),  m     ] [ÿ] = [F₀·cos(ωt) - mg - ky - bẏ - m·L·cos(φ)·φ̇²]',
+          '',
+          'Ограничители (при включении):',
+          'если y < y_min: y = y_min, ẏ = 0.3·|ẏ| (мягкий отскок)',
+          'если y > y_max: y = y_max, ẏ = -0.3·|ẏ| (мягкий отскок)'
+        ],
+        parameters: {
+          m: { value: P.m, unit: 'кг', description: 'Масса груза' },
+          k: { value: P.k, unit: 'Н/м', description: 'Жёсткость пружины' },
+          b: { value: P.b, unit: 'Н·с/м', description: 'Коэффициент демпфирования' },
+          omega: { value: P.omega, unit: 'рад/с', description: 'Частота вынуждающей силы' },
+          F0: { value: P.F0, unit: 'Н', description: 'Амплитуда вынуждающей силы' },
+          L: { value: P.L, unit: 'м', description: 'Длина стержня' },
+          g: { value: P.g, unit: 'м/с²', description: 'Ускорение свободного падения' }
+        },
+        derived: {
+          omega0: { value: crit.omega0.toFixed(4), unit: 'рад/с', formula: '√(k/m)', description: 'Собственная частота пружины' },
+          omega_phi: { value: crit.omega_phi.toFixed(4), unit: 'рад/с', formula: '√(g/L)', description: 'Собственная частота маятника' },
+          omega_ratio: { value: (P.omega/crit.omega0).toFixed(4), formula: 'ω/ω₀', description: 'Отношение частот возбуждения к собственной' },
+          zeta: { value: crit.zeta.toFixed(4), formula: 'b/(2√(km))', description: 'Коэффициент демпфирования (относительный)' },
+          force_ratio: { value: (P.F0/(P.m*P.g)).toFixed(4), formula: 'F₀/(mg)', description: 'Отношение амплитуды вибрации к весу' }
+        }
+      };
+      
+      var solutionMethod = {
+        name: 'Классический метод Рунге-Кутты 4-го порядка (RK4)',
+        description: 'Явный одношаговый метод численного интегрирования ОДУ. Обеспечивает точность O(h⁴) на каждом шаге.',
+        algorithm: [
+          'Для системы dy/dt = f(t, y):',
+          'k₁ = f(tₙ, yₙ)',
+          'k₂ = f(tₙ + h/2, yₙ + h·k₁/2)',
+          'k₃ = f(tₙ + h/2, yₙ + h·k₂/2)',
+          'k₄ = f(tₙ + h, yₙ + h·k₃)',
+          'yₙ₊₁ = yₙ + (h/6)·(k₁ + 2k₂ + 2k₃ + k₄)',
+          'tₙ₊₁ = tₙ + h'
+        ],
+        parameters: {
+          order: 4,
+          baseFrameDt: 0.016,
+          scaledDt: 0.016 * P.speed,
+          numberOfStepsPerFrame: Math.max(100, Math.ceil(P.omega * 0.016 * P.speed * 10)),
+          adaptiveStep: 'h = scaledDt / N',
+          samplingInterval: 0.02,
+          totalStepsInRecording: Math.ceil((time - effectRecordStartTime) / 0.02)
+        },
+        stability: {
+          method: 'Адаптивное увеличение числа шагов N пропорционально ω',
+          formula: 'N = max(100, ⌈ω·Δt·10⌉)',
+          protection: 'Ограничение ускорений: |φ̈|, |ÿ| ≤ 1000 рад/с² (или м/с²)',
+          singularityProtection: 'При |det(A)| < 10⁻⁶ используется упрощённое решение'
+        }
+      };
+      
+      var historyForVerification = lastSavedEffect.historySnapshot || yHistory;
+      var totalRot = 0;
+      for (var i = 1; i < historyForVerification.length; i++) {
+        var dPhi = historyForVerification[i].phi - historyForVerification[i-1].phi;
+        while (dPhi > Math.PI) dPhi -= 2*Math.PI;
+        while (dPhi < -Math.PI) dPhi += 2*Math.PI;
+        totalRot += dPhi;
+      }
+      var dtHist = historyForVerification.length > 1 ? 
+        historyForVerification[historyForVerification.length-1].t - historyForVerification[0].t : 1;
+      
+      var verification = {
+        initialState: {
+          t: lastSavedEffect.startTime.toFixed(4),
+          phi: lastSavedEffect.phiAtStart.toFixed(6),
+          phiDot: lastSavedEffect.phiDotAtStart.toFixed(6),
+          y: lastSavedEffect.yAtStart.toFixed(6),
+          yDot: lastSavedEffect.yDotAtStart.toFixed(6)
+        },
+        finalState: {
+          t: lastSavedEffect.endTime.toFixed(4),
+          phi: lastSavedEffect.phiAtEnd.toFixed(6),
+          phiDot: lastSavedEffect.phiDotAtEnd.toFixed(6),
+          y: lastSavedEffect.yAtEnd.toFixed(6),
+          yDot: lastSavedEffect.yDotAtEnd.toFixed(6)
+        },
+        invariants: {
+          totalRotation: totalRot.toFixed(4),
+          numberOfFullRotations: (totalRot / (2*Math.PI)).toFixed(3),
+          meanAngularVelocity: (totalRot / dtHist).toFixed(4)
+        }
+      };
+      
+      var meanOmega = totalRot / dtHist;
+      var classRatio = Math.abs(meanOmega) / P.omega;
+      var classification = 'Не классифицирован';
+      if (Math.abs(classRatio - 1) < 0.05) classification = 'Синхронное вращение (φ̇ ≈ ω)';
+      else if (Math.abs(classRatio - 2) < 0.1) classification = 'Субгармоническое вращение 2-го порядка (φ̇ ≈ 2ω)';
+      else if (Math.abs(classRatio - 3) < 0.15) classification = 'Субгармоническое вращение 3-го порядка (φ̇ ≈ 3ω)';
+      else if (Math.abs(classRatio - 0.5) < 0.05) classification = 'Субгармоническое вращение (φ̇ ≈ ω/2)';
+      else if (classRatio > 1.5) classification = 'Сверхсинхронное вращение (φ̇ > ω)';
+      else if (classRatio < 0.5 && classRatio > 0) classification = 'Медленное вращение (φ̇ < ω/2)';
+      else classification = 'Несинхронное вращение (φ̇/ω = ' + classRatio.toFixed(3) + ')';
+      
+      var effect = {
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2,8),
+        name: name,
+        description: desc,
+        classification: classification,
+        timestamp: Date.now(),
+        time: new Date().toLocaleString('ru-RU'),
+        equations: equations,
+        solutionMethod: solutionMethod,
+        verification: verification,
+        parameters: JSON.parse(JSON.stringify(P)),
+        initialConditions: { phi0: phi0, y0: y0 },
+        criticalFrequencies: crit,
+        zone: zoneInfo,
+        recordStartTime: lastSavedEffect.startTime,
+        recordEndTime: lastSavedEffect.endTime,
+        duration: lastSavedEffect.duration,
+        trajectory: lastSavedEffect.trajectory
+      };
+      
+      var effects = loadEffects();
+      effects.push(effect);
+      saveEffects(effects);
+      document.getElementById('saveEffectModal').style.display = 'none';
+      saveEffectBtn.disabled = true;
+      lastSavedEffect = null;
+      effectTrajectory = [];
+      updateStatus(paused);
+      alert('✅ Эффект "' + name + '" сохранён!\n\nКлассификация: ' + classification);
+    });
+
+    document.getElementById('startBtn').addEventListener('click', function() {
+      phi = phi0; phiDot = 0; y = y0; yDot = 0; time = 0;
+      yHistory = []; limitHitTime = 0; limitHitSide = 0;
+      isRecordingEffect = false;
+      effectTrajectory = [];
+      recordEffectBtn.disabled = false;
+      recordEffectBtn.classList.remove('recording-pulse');
+      stopRecordBtn.disabled = true;
+      saveEffectBtn.disabled = true;
+      lastSavedEffect = null;
+      started = true; paused = false; updateStatus(true);
+    });
+
+    document.getElementById('stopBtn').addEventListener('click', function() {
+      paused = !paused; this.textContent = paused ? '▶ Продолжить' : '⏸ Стоп'; updateStatus(paused);
+    });
+
+    document.getElementById('idealBtn').addEventListener('click', function() {
+      P.m=0.5; P.k=500; P.b=5.0; P.omega=30; P.F0=40; P.L=0.65; phi0=0.1; y0=0; P.speed=0.3; 
+      P.yMin=-0.3; P.yMax=0.3; P.enableLimits=true;
+      document.getElementById('p_m').value=0.5; document.getElementById('v_m').textContent='0.5';
+      document.getElementById('p_k').value=500; document.getElementById('v_k').textContent='500';
+      document.getElementById('p_b').value=5.0; document.getElementById('v_b').textContent='5.0';
+      document.getElementById('p_omega').value=30; document.getElementById('v_omega').textContent='30';
+      document.getElementById('p_F0').value=40; document.getElementById('v_F0').textContent='40';
+      document.getElementById('p_L').value=0.65; document.getElementById('v_L').textContent='0.65';
+      document.getElementById('p_phi0').value=0.1; document.getElementById('v_phi0').textContent='0.1';
+      document.getElementById('p_y0').value=0; document.getElementById('v_y0').textContent='0.0';
+      document.getElementById('p_speed').value=0.3; document.getElementById('v_speed').textContent='0.3x';
+      document.getElementById('p_ymin').value=-0.3; document.getElementById('v_ymin').textContent='-0.30';
+      document.getElementById('p_ymax').value=0.3; document.getElementById('v_ymax').textContent='0.30';
+      document.getElementById('enableLimits').checked = true;
+      setActivePreset('presetSymmetric');
+      phi = phi0; phiDot = 0; y = y0; yDot = 0; time = 0;
+      yHistory = []; limitHitTime = 0; limitHitSide = 0;
+      isRecordingEffect = false; effectTrajectory = [];
+      recordEffectBtn.disabled = false;
+      recordEffectBtn.classList.remove('recording-pulse');
+      stopRecordBtn.disabled = true;
+      saveEffectBtn.disabled = true;
+      lastSavedEffect = null;
+      started = true; paused = false;
+      document.getElementById('stopBtn').textContent = '⏸ Стоп'; updateStatus(true);
+      updateCriticalDisplay();
+    });
+
+    function updateStatus(isPaused) {
+      var s = document.getElementById('status');
+      var speedText = ' | Скорость: ' + P.speed.toFixed(1) + 'x';
+      var limitText = P.enableLimits ? ' | Огранич.: ВКЛ' : ' | Огранич.: ВЫКЛ';
+      var recText = '';
+      if (isRecordingEffect) {
+        recText = ' | 🔴 ЗАПИСЬ (' + effectTrajectory.length + ')';
+      } else if (lastSavedEffect && !saveEffectBtn.disabled) {
+        recText = ' | 💾 Готово к сохранению';
+      }
+      if (!started) s.textContent = 'Готов' + speedText + limitText;
+      else if (isPaused) s.textContent = '⏸ Пауза' + speedText + limitText + recText;
+      else s.textContent = '⟳ Симуляция...' + speedText + limitText + recText;
+    }
+
+    var NOTES_KEY = 'udochka_notes_v1';
+    var storageAvailable = false;
+    try { localStorage.setItem('__t', '1'); localStorage.removeItem('__t'); storageAvailable = true; } catch(e) {}
+    var memoryNotes = [];
+    
+    function loadNotes() {
+      if (storageAvailable) { 
+        try { 
+          var data = localStorage.getItem(NOTES_KEY); 
+          return data ? JSON.parse(data) : []; 
+        } catch(e) { return memoryNotes.slice(); } 
+      }
+      return memoryNotes.slice();
+    }
+    
+    function saveNotes(notes) { 
+      memoryNotes = notes.slice(); 
+      if (storageAvailable) try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch(e) {} 
+    }
+    
+    function escapeHtml(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+    
+    function renderNotes() {
+      var notes = loadNotes(); 
+      var list = document.getElementById('notesList');
+      document.getElementById('storageStatus').innerHTML = storageAvailable ? 
+        '<div class="storage-ok">✅ Сохраняется в браузере</div>' : 
+        '<div style="color:#ff9800;font-size:11px;">⚠️ Только в памяти сессии</div>';
+      if (notes.length === 0) { 
+        list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">Пусто</div>'; 
+        return; 
+      }
+      list.innerHTML = notes.slice().sort(function(a,b){return b.timestamp-a.timestamp;}).map(function(n) {
+        return '<div class="note-item"><button class="note-delete" data-id="' + n.id + '">✕</button><div class="note-time">' + escapeHtml(n.time) + '</div><div class="note-text">' + escapeHtml(n.text) + '</div></div>';
+      }).join('');
+      var btns = list.querySelectorAll('.note-delete');
+      for (var i = 0; i < btns.length; i++) { 
+        btns[i].addEventListener('click', function() { deleteNote(this.getAttribute('data-id')); }); 
+      }
+    }
+    
+    function deleteNote(id) { 
+      saveNotes(loadNotes().filter(function(n) { return n.id !== id; })); 
+      renderNotes(); 
+    }
+    
+    document.getElementById('addNoteBtn').addEventListener('click', function() {
+      var input = document.getElementById('noteInput'); 
+      if (!input.value.trim()) return;
+      var notes = loadNotes(); 
+      var now = new Date();
+      notes.push({ 
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2,8), 
+        timestamp: now.getTime(), 
+        time: now.toLocaleString('ru-RU'), 
+        text: input.value.trim() 
+      });
+      saveNotes(notes); 
+      input.value = ''; 
+      renderNotes();
+    });
+    
+    document.getElementById('copyNotesBtn').addEventListener('click', function() {
+      var notes = loadNotes();
+      if (notes.length === 0) { alert('Журнал пуст'); return; }
+      var text = notes.slice().sort(function(a,b){return b.timestamp-a.timestamp;}).map(function(n) { 
+        return '[' + n.time + ']\n' + n.text; 
+      }).join('\n\n---\n\n');
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { 
+        document.execCommand('copy'); 
+        this.textContent = '✅ Скопировано!'; 
+        var btn = this;
+        setTimeout(function() { btn.textContent = '📋 Копировать все'; }, 2000);
+      } catch (e) { this.textContent = '❌ Ошибка'; }
+      document.body.removeChild(ta);
+    });
+
+    var EFFECTS_KEY = 'udochka_effects_v1';
+    var memoryEffects = [];
+    
+    function loadEffects() {
+      if (storageAvailable) { 
+        try { 
+          var data = localStorage.getItem(EFFECTS_KEY); 
+          return data ? JSON.parse(data) : []; 
+        } catch(e) { return memoryEffects.slice(); } 
+      }
+      return memoryEffects.slice();
+    }
+    
+    function saveEffects(effects) { 
+      memoryEffects = effects.slice(); 
+      if (storageAvailable) try { localStorage.setItem(EFFECTS_KEY, JSON.stringify(effects)); } catch(e) {} 
+    }
+    
+    function renderLibrary() {
+      var effects = loadEffects(); 
+      var list = document.getElementById('libraryList');
+      document.getElementById('libraryStorageStatus').innerHTML = storageAvailable ? 
+        '<div class="storage-ok">✅ Библиотека (записей: ' + effects.length + ')</div>' : 
+        '<div style="color:#ff9800;font-size:11px;">⚠️ Только в памяти</div>';
+      
+      if (effects.length === 0) { 
+        list.innerHTML = '<div class="empty-library">📭 Библиотека пуста<br><br>1. Запустите симуляцию<br>2. Нажмите "⏺ Запись эффекта"<br>3. Наблюдайте интересный режим<br>4. Нажмите "⏹ Стоп запись"<br>5. Нажмите "💾 Сохранить"</div>'; 
+        return; 
+      }
+      
+      list.innerHTML = effects.slice().sort(function(a,b){return b.timestamp-a.timestamp;}).map(function(e) {
+        var paramStr = 'm=' + e.parameters.m + ', k=' + e.parameters.k + ', b=' + e.parameters.b + 
+                       ', ω=' + e.parameters.omega + ', F₀=' + e.parameters.F0 + ', L=' + e.parameters.L +
+                       ', φ₀=' + e.initialConditions.phi0 + ', y₀=' + e.initialConditions.y0;
+        var classStr = e.classification ? '<div class="effect-classification">🏷 ' + escapeHtml(e.classification) + '</div>' : '';
+        return '<div class="effect-item">' +
+          '<div class="effect-header">' +
+            '<span class="effect-name">' + escapeHtml(e.name) + '</span>' +
+            '<span class="effect-time">' + escapeHtml(e.time) + '</span>' +
+          '</div>' +
+          classStr +
+          '<div class="effect-desc">' + escapeHtml(e.description) + '</div>' +
+          '<div class="effect-params">' + escapeHtml(paramStr) + '<br>Длительность: ' + e.duration.toFixed(2) + ' с | Точек: ' + e.trajectory.length + '</div>' +
+          '<div class="effect-actions">' +
+            '<button class="effect-btn effect-btn-copy" data-id="' + e.id + '">📋 Копировать</button>' +
+            '<button class="effect-btn effect-btn-load" data-id="' + e.id + '">🔄 Загрузить</button>' +
+            '<button class="effect-btn effect-btn-delete" data-id="' + e.id + '">🗑 Удалить</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+      
+      var newList = list.cloneNode(true);
+      list.parentNode.replaceChild(newList, list);
+      
+      var copyBtns = newList.querySelectorAll('.effect-btn-copy');
+      for (var i = 0; i < copyBtns.length; i++) {
+        copyBtns[i].addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          copyEffect(this.getAttribute('data-id'));
+        });
+      }
+      
+      var loadBtns = newList.querySelectorAll('.effect-btn-load');
+      for (var i = 0; i < loadBtns.length; i++) {
+        loadBtns[i].addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          loadEffect(this.getAttribute('data-id'));
+        });
+      }
+      
+      var delBtns = newList.querySelectorAll('.effect-btn-delete');
+      for (var i = 0; i < delBtns.length; i++) {
+        delBtns[i].addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          deleteEffect(this.getAttribute('data-id'));
+        });
+      }
+    }
+    
+    function copyEffect(id) {
+      var effects = loadEffects();
+      var effect = null;
+      for (var i = 0; i < effects.length; i++) {
+        if (effects[i].id === id) { effect = effects[i]; break; }
+      }
+      if (!effect) { alert('Эффект не найден'); return; }
+      
+      var text = '═══════════════════════════════════════════════════════\n';
+      text += '           ДИНАМИЧЕСКИЙ ЭФФЕКТ (полная спецификация)\n';
+      text += '═══════════════════════════════════════════════════════\n\n';
+      
+      text += 'Название: ' + effect.name + '\n';
+      text += 'Классификация: ' + (effect.classification || 'не указана') + '\n';
+      text += 'Дата записи: ' + effect.time + '\n';
+      text += 'Длительность: ' + effect.duration.toFixed(3) + ' с\n\n';
+      
+      text += '───────────────────────────────────────────────────────\n';
+      text += '1. ОПИСАНИЕ ЭФФЕКТА\n';
+      text += '───────────────────────────────────────────────────────\n';
+      text += effect.description + '\n\n';
+      
+      text += '───────────────────────────────────────────────────────\n';
+      text += '2. МАТЕМАТИЧЕСКАЯ МОДЕЛЬ\n';
+      text += '───────────────────────────────────────────────────────\n';
+      text += effect.equations.description + '\n\n';
+      
+      text += 'Функция Лагранжа:\n';
+      text += '  Кинетическая энергия: ' + effect.equations.lagrangian.kinetic + '\n';
+      text += '  Потенциальная энергия: ' + effect.equations.lagrangian.potential + '\n';
+      text += '  Диссипативная функция: ' + effect.equations.lagrangian.dissipative + '\n\n';
+      
+      text += 'Система уравнений движения:\n';
+      for (var i = 0; i < effect.equations.equations.length; i++) {
+        text += '  ' + effect.equations.equations[i] + '\n';
+      }
+      text += '\n';
+      
+      text += '───────────────────────────────────────────────────────\n';
+      text += '3. ПАРАМЕТРЫ СИСТЕМЫ\n';
+      text += '───────────────────────────────────────────────────────\n';
+      var params = effect.equations.parameters;
+      for (var key in params) {
+        text += '  ' + key + ' = ' + params[key].value + ' ' + params[key].unit + 
+                '  (' + params[key].description + ')\n';
+      }
+      text += '\nПроизводные параметры:\n';
+      var derived = effect.equations.derived;
+      for (var key in derived) {
+        text += '  ' + key + ' = ' + derived[key].value + ' ' + (derived[key].unit || '') + 
+                '  [' + derived[key].formula + '] — ' + derived[key].description + '\n';
+      }
+      text += '\n';
+      
+      text += '───────────────────────────────────────────────────────\n';
+      text += '4. МЕТОД ЧИСЛЕННОГО РЕШЕНИЯ\n';
+      text += '───────────────────────────────────────────────────────\n';
+      text += 'Название: ' + effect.solutionMethod.name + '\n';
+      text += 'Описание: ' + effect.solutionMethod.description + '\n\n';
+      text += 'Алгоритм:\n';
+      for (var i = 0; i < effect.solutionMethod.algorithm.length; i++) {
+        text += '  ' + effect.solutionMethod.algorithm[i] + '\n';
+      }
+      text += '\nПараметры метода:\n';
+      var mp = effect.solutionMethod.parameters;
+      text += '  Порядок метода: ' + mp.order + '\n';
+      text += '  Базовый шаг кадра: ' + mp.baseFrameDt + ' с\n';
+      text += '  Масштабированный шаг: ' + mp.scaledDt.toFixed(5) + ' с\n';
+      text += '  Число шагов на кадр: ' + mp.numberOfStepsPerFrame + '\n';
+      text += '  Формула шага: ' + mp.adaptiveStep + '\n';
+      text += '  Интервал дискретизации записи: ' + mp.samplingInterval + ' с\n';
+      text += '  Всего шагов в записи: ' + mp.totalStepsInRecording + '\n\n';
+      text += 'Обеспечение устойчивости:\n';
+      text += '  ' + effect.solutionMethod.stability.method + '\n';
+      text += '  Формула: ' + effect.solutionMethod.stability.formula + '\n';
+      text += '  Защита: ' + effect.solutionMethod.stability.protection + '\n';
+      text += '  Защита от сингулярности: ' + effect.solutionMethod.stability.singularityProtection + '\n\n';
+      
+      text += '───────────────────────────────────────────────────────\n';
+      text += '5. НАЧАЛЬНЫЕ И ГРАНИЧНЫЕ УСЛОВИЯ\n';
+      text += '───────────────────────────────────────────────────────\n';
+      text += 'Начальные условия:\n';
+      text += '  φ₀ = ' + effect.initialConditions.phi0 + ' рад\n';
+      text += '  y₀ = ' + effect.initialConditions.y0 + ' м\n';
+      text += '  φ̇₀ = 0 рад/с\n';
+      text += '  ẏ₀ = 0 м/с\n\n';
+      text += 'Ограничители:\n';
+      text += '  Включены: ' + effect.parameters.enableLimits + '\n';
+      text += '  y_min = ' + effect.parameters.yMin + ' м\n';
+      text += '  y_max = ' + effect.parameters.yMax + ' м\n\n';
+      
+      text += '───────────────────────────────────────────────────────\n';
+      text += '6. ДАННЫЕ ДЛЯ ВЕРИФИКАЦИИ\n';
+      text += '───────────────────────────────────────────────────────\n';
+      text += 'Начальное состояние (t = ' + effect.verification.initialState.t + ' с):\n';
+      text += '  φ  = ' + effect.verification.initialState.phi + ' рад\n';
+      text += '  φ̇  = ' + effect.verification.initialState.phiDot + ' рад/с\n';
+      text += '  y  = ' + effect.verification.initialState.y + ' м\n';
+      text += '  ẏ  = ' + effect.verification.initialState.yDot + ' м/с\n\n';
+      
+      text += 'Конечное состояние (t = ' + effect.verification.finalState.t + ' с):\n';
+      text += '  φ  = ' + effect.verification.finalState.phi + ' рад\n';
+      text += '  φ̇  = ' + effect.verification.finalState.phiDot + ' рад/с\n';
+      text += '  y  = ' + effect.verification.finalState.y + ' м\n';
+      text += '  ẏ  = ' + effect.verification.finalState.yDot + ' м/с\n\n';
+      
+      text += 'Инварианты движения:\n';
+      text += '  Полное вращение: ' + effect.verification.invariants.totalRotation + ' рад\n';
+      text += '  Число оборотов: ' + effect.verification.invariants.numberOfFullRotations + '\n';
+      text += '  Средняя угловая скорость: ' + effect.verification.invariants.meanAngularVelocity + ' рад/с\n\n';
+      
+      text += '───────────────────────────────────────────────────────\n';
+      text += '7. КРИТИЧЕСКИЕ ЧАСТОТЫ И ЗОНА РАБОТЫ\n';
+      text += '───────────────────────────────────────────────────────\n';
+      var cf = effect.criticalFrequencies;
+      text += '  ω₀ = ' + cf.omega0.toFixed(4) + ' рад/с (собственная пружины)\n';
+      text += '  ω_res = ' + cf.omega_res.toFixed(4) + ' рад/с (резонанс)\n';
+      text += '  ω_anti = ' + cf.omega_anti.toFixed(4) + ' рад/с (анти-резонанс)\n';
+      text += '  ω_φ = ' + cf.omega_phi.toFixed(4) + ' рад/с (маятника)\n';
+      text += '  2ω_φ = ' + cf.omega_2phi.toFixed(4) + ' рад/с (зона Матье)\n';
+      text += '  b_crit = ' + cf.b_crit.toFixed(4) + ' Н·с/м\n';
+      text += '  ζ = ' + cf.zeta.toFixed(4) + '\n';
+      text += '  k_eff = ' + cf.k_eff.toFixed(2) + ' Н/м (эффективная жёсткость)\n\n';
+      text += 'Зона работы: ' + effect.zone.name + '\n\n';
+      
+      text += '───────────────────────────────────────────────────────\n';
+      text += '8. ИНСТРУКЦИЯ ПО ВОСПРОИЗВЕДЕНИЮ\n';
+      text += '───────────────────────────────────────────────────────\n';
+      text += 'Для воспроизведения данного эффекта необходимо:\n\n';
+      text += '1. Установить параметры системы (раздел 3)\n';
+      text += '2. Задать начальные условия (раздел 5)\n';
+      text += '3. Настроить метод решения (раздел 4)\n';
+      text += '4. Провести интегрирование на интервале t ∈ [' + 
+              effect.verification.initialState.t + '; ' + effect.verification.finalState.t + '] с\n';
+      text += '5. Проверить соответствие конечного состояния (раздел 6)\n';
+      text += '6. Убедиться, что инварианты совпадают в пределах точности метода\n\n';
+      text += 'Ожидаемый результат:\n';
+      text += '  ' + (effect.classification || 'режим не классифицирован') + '\n';
+      text += '  Средняя угловая скорость: ' + effect.verification.invariants.meanAngularVelocity + ' рад/с\n';
+      text += '  Число оборотов: ' + effect.verification.invariants.numberOfFullRotations + '\n\n';
+      
+      text += '───────────────────────────────────────────────────────\n';
+      text += '9. ЗАПИСЬ КОЛЕБАНИЙ (траектория)\n';
+      text += '───────────────────────────────────────────────────────\n';
+      text += 'Дискретизация: dt = 0.02 с, точек: ' + effect.trajectory.length + '\n\n';
+      text += 't (с)\ty (м)\tφ (рад)\tφ̇ (рад/с)\n';
+      
+      for (var i = 0; i < effect.trajectory.length; i++) {
+        var p = effect.trajectory[i];
+        text += p.t.toFixed(3) + '\t' + p.y.toFixed(4) + '\t' + p.phi.toFixed(4) + '\t' + (p.phiDot || 0).toFixed(4) + '\n';
+      }
+      
+      text += '\n═══════════════════════════════════════════════════════\n';
+      text += 'Конец спецификации\n';
+      text += '═══════════════════════════════════════════════════════\n';
+      
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { 
+        document.execCommand('copy'); 
+        alert('✅ Спецификация "' + effect.name + '" скопирована!\n\nОбъём: ' + text.length + ' символов\nСтрок: ' + text.split('\n').length);
+      } catch (e) { 
+        alert('❌ Ошибка копирования');
+      }
+      document.body.removeChild(ta);
+    }
+    
+    function loadEffect(id) {
+      var effects = loadEffects();
+      var effect = null;
+      for (var i = 0; i < effects.length; i++) {
+        if (effects[i].id === id) { effect = effects[i]; break; }
+      }
+      if (!effect) { alert('Эффект не найден'); return; }
+      
+      if (!confirm('Загрузить параметры эффекта "' + effect.name + '"?\n\nТекущие параметры будут заменены.')) {
+        return;
+      }
+      
+      P.m = effect.parameters.m;
+      P.k = effect.parameters.k;
+      P.b = effect.parameters.b;
+      P.omega = effect.parameters.omega;
+      P.F0 = effect.parameters.F0;
+      P.L = effect.parameters.L;
+      P.yMin = effect.parameters.yMin;
+      P.yMax = effect.parameters.yMax;
+      P.enableLimits = effect.parameters.enableLimits;
+      phi0 = effect.initialConditions.phi0;
+      y0 = effect.initialConditions.y0;
+      
+      document.getElementById('p_m').value = P.m; document.getElementById('v_m').textContent = P.m.toFixed(1);
+      document.getElementById('p_k').value = P.k; document.getElementById('v_k').textContent = P.k.toFixed(0);
+      document.getElementById('p_b').value = P.b; document.getElementById('v_b').textContent = P.b.toFixed(1);
+      document.getElementById('p_omega').value = P.omega; document.getElementById('v_omega').textContent = P.omega.toFixed(0);
+      document.getElementById('p_F0').value = P.F0; document.getElementById('v_F0').textContent = P.F0.toFixed(0);
+      document.getElementById('p_L').value = P.L; document.getElementById('v_L').textContent = P.L.toFixed(2);
+      document.getElementById('p_ymin').value = P.yMin; document.getElementById('v_ymin').textContent = P.yMin.toFixed(2);
+      document.getElementById('p_ymax').value = P.yMax; document.getElementById('v_ymax').textContent = P.yMax.toFixed(2);
+      document.getElementById('p_phi0').value = phi0; document.getElementById('v_phi0').textContent = phi0.toFixed(2);
+      document.getElementById('p_y0').value = y0; document.getElementById('v_y0').textContent = y0.toFixed(2);
+      document.getElementById('enableLimits').checked = P.enableLimits;
+      
+      document.getElementById('libraryModal').style.display = 'none';
+      
+      phi = phi0; phiDot = 0; y = y0; yDot = 0; time = 0;
+      yHistory = []; limitHitTime = 0; limitHitSide = 0;
+      isRecordingEffect = false; effectTrajectory = [];
+      recordEffectBtn.disabled = false;
+      recordEffectBtn.classList.remove('recording-pulse');
+      stopRecordBtn.disabled = true;
+      saveEffectBtn.disabled = true;
+      lastSavedEffect = null;
+      started = true; paused = false;
+      document.getElementById('stopBtn').textContent = '⏸ Стоп';
+      updateStatus(true);
+      updateCriticalDisplay();
+      
+      alert('✅ Эффект "' + effect.name + '" загружен!');
+    }
+    
+    function deleteEffect(id) {
+      var effects = loadEffects();
+      var effect = null;
+      for (var i = 0; i < effects.length; i++) {
+        if (effects[i].id === id) { effect = effects[i]; break; }
+      }
+      if (!effect) return;
+      
+      if (!confirm('Удалить эффект "' + effect.name + '"?\nЭто действие нельзя отменить.')) {
+        return;
+      }
+      
+      saveEffects(effects.filter(function(e) { return e.id !== id; }));
+      renderLibrary();
+    }
+
+    var currentSpectrumData = null;
+    var currentSpectrumSignal = 'y';
+    
+    function computeDFT(signal, fs) {
+      var N = signal.length;
+      var frequencies = [];
+      var amplitudes = [];
+      var maxFreq = Math.floor(N / 2);
+      
+      for (var k = 0; k < maxFreq; k++) {
+        var freq = k * fs / N;
+        var real = 0;
+        var imag = 0;
+        for (var n = 0; n < N; n++) {
+          var angle = -2 * Math.PI * k * n / N;
+          real += signal[n] * Math.cos(angle);
+          imag += signal[n] * Math.sin(angle);
+        }
+        var amplitude = Math.sqrt(real * real + imag * imag) / N;
+        frequencies.push(freq);
+        amplitudes.push(amplitude);
+      }
+      return { frequencies: frequencies, amplitudes: amplitudes };
+    }
+    
+    function findPeaks(frequencies, amplitudes, threshold) {
+      var peaks = [];
+      var minProminence = threshold || 0.1;
+      var maxAmplitude = Math.max.apply(null, amplitudes);
+      for (var i = 1; i < amplitudes.length - 1; i++) {
+        if (amplitudes[i] > amplitudes[i-1] && amplitudes[i] > amplitudes[i+1]) {
+          if (amplitudes[i] / maxAmplitude > minProminence) {
+            peaks.push({
+              frequency: frequencies[i],
+              amplitude: amplitudes[i],
+              ratio: amplitudes[i] / maxAmplitude
+            });
+          }
+        }
+      }
+      peaks.sort(function(a, b) { return b.amplitude - a.amplitude; });
+      return peaks.slice(0, 10);
+    }
+    
+    function calculateRotationFrequency() {
+      if (yHistory.length < 10) return null;
+      var totalTime = yHistory[yHistory.length - 1].t - yHistory[0].t;
+      var totalRotation = 0;
+      for (var i = 1; i < yHistory.length; i++) {
+        var dPhi = yHistory[i].phi - yHistory[i-1].phi;
+        while (dPhi > Math.PI) dPhi -= 2 * Math.PI;
+        while (dPhi < -Math.PI) dPhi += 2 * Math.PI;
+        totalRotation += dPhi;
+      }
+      var avgOmega = totalRotation / totalTime;
+      var rotationFreq = Math.abs(avgOmega);
+      var period = rotationFreq > 0 ? 2 * Math.PI / rotationFreq : Infinity;
+      var ratio = rotationFreq / P.omega;
+      return {
+        omega: rotationFreq,
+        frequency: rotationFreq / (2 * Math.PI),
+        period: period,
+        ratio: ratio
+      };
+    }
+    
+    function analyzeSpectrum() {
+      var signal;
+      if (currentSpectrumSignal === 'y') {
+        signal = yHistory.map(function(p) { return p.y; });
+      } else if (currentSpectrumSignal === 'phi') {
+        signal = yHistory.map(function(p) { return p.phi; });
+      } else {
+        signal = yHistory.map(function(p) { return p.phiDot || 0; });
+      }
+      if (yHistory.length < 2) return;
+      var dt = yHistory[yHistory.length - 1].t - yHistory[0].t;
+      var fs = signal.length / dt;
+      var duration = dt;
+      var windowedSignal = [];
+      for (var i = 0; i < signal.length; i++) {
+        var w = 0.54 - 0.46 * Math.cos(2 * Math.PI * i / (signal.length - 1));
+        windowedSignal.push(signal[i] * w);
+      }
+      var spectrum = computeDFT(windowedSignal, fs);
+      var peaks = findPeaks(spectrum.frequencies, spectrum.amplitudes, 0.05);
+      currentSpectrumData = {
+        signal: currentSpectrumSignal,
+        duration: duration,
+        points: signal.length,
+        fs: fs,
+        frequencies: spectrum.frequencies,
+        amplitudes: spectrum.amplitudes,
+        peaks: peaks
+      };
+      drawSpectrum();
+      displayPeaks();
+      var rotation = calculateRotationFrequency();
+      if (rotation) {
+        document.getElementById('rotationOmega').textContent = rotation.omega.toFixed(2);
+        document.getElementById('rotationFrequency').textContent = rotation.frequency.toFixed(2) + ' Гц';
+        document.getElementById('rotationPeriod').textContent = rotation.period.toFixed(3);
+        document.getElementById('rotationRatio').textContent = rotation.ratio.toFixed(3);
+        var statusEl = document.getElementById('rotationStatus');
+        if (Math.abs(rotation.ratio - 1) < 0.05) {
+          statusEl.textContent = '✅ Синхронное вращение (ω_rot ≈ ω)';
+          statusEl.style.color = '#4caf50';
+        } else if (rotation.ratio > 1.5) {
+          statusEl.textContent = '⚡ Быстрое вращение (ω_rot > ω)';
+          statusEl.style.color = '#ff9800';
+        } else if (rotation.ratio < 0.5) {
+          statusEl.textContent = '🐌 Медленное вращение (ω_rot < ω)';
+          statusEl.style.color = '#2196f3';
+        } else {
+          statusEl.textContent = '🔄 Несинхронное вращение';
+          statusEl.style.color = '#ccc';
+        }
+      }
+      document.getElementById('spectrumDuration').textContent = duration.toFixed(2) + ' с';
+      document.getElementById('spectrumPoints').textContent = signal.length;
+      document.getElementById('spectrumFs').textContent = fs.toFixed(1);
+      var crit = computeCriticalParams();
+      document.getElementById('driveFreq').textContent = P.omega.toFixed(2);
+      document.getElementById('naturalFreq').textContent = crit.omega0.toFixed(2);
+      document.getElementById('pendulumFreq').textContent = crit.omega_phi.toFixed(2);
+    }
+    
+    function drawSpectrum() {
+      if (!currentSpectrumData) return;
+      var canvas = document.getElementById('spectrumCanvas');
+      var ctx = canvas.getContext('2d');
+      var W = canvas.width;
+      var H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+      var padLeft = 60, padRight = 20, padTop = 20, padBottom = 40;
+      var gW = W - padLeft - padRight;
+      var gH = H - padTop - padBottom;
+      var maxFreq = Math.min(100, currentSpectrumData.frequencies[currentSpectrumData.frequencies.length - 1]);
+      var maxAmp = Math.max.apply(null, currentSpectrumData.amplitudes);
+      function getX(f) { return padLeft + (f / maxFreq) * gW; }
+      function getY(a) { return padTop + gH - (a / maxAmp) * gH; }
+      ctx.strokeStyle = '#666';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(padLeft, padTop);
+      ctx.lineTo(padLeft, H - padBottom);
+      ctx.lineTo(W - padRight, H - padBottom);
+      ctx.stroke();
+      ctx.fillStyle = '#ccc';
+      ctx.font = 'bold 12px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('Частота f (рад/с)', padLeft + gW / 2, H - 10);
+      ctx.save();
+      ctx.translate(15, padTop + gH / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText('Амплитуда', 0, 0);
+      ctx.restore();
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      ctx.fillStyle = '#888';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'center';
+      var freqStep = 10;
+      for (var f = 0; f <= maxFreq; f += freqStep) {
+        var x = getX(f);
+        ctx.beginPath();
+        ctx.moveTo(x, padTop);
+        ctx.lineTo(x, H - padBottom);
+        ctx.stroke();
+        ctx.fillText(f.toFixed(0), x, H - padBottom + 15);
+      }
+      ctx.textAlign = 'right';
+      for (var a = 0; a <= 1; a += 0.25) {
+        var y = getY(a * maxAmp);
+        ctx.beginPath();
+        ctx.moveTo(padLeft, y);
+        ctx.lineTo(W - padRight, y);
+        ctx.stroke();
+        ctx.fillText((a * 100).toFixed(0) + '%', padLeft - 5, y + 3);
+      }
+      ctx.strokeStyle = '#00bcd4';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (var i = 0; i < currentSpectrumData.frequencies.length; i++) {
+        var f = currentSpectrumData.frequencies[i];
+        if (f > maxFreq) break;
+        var x = getX(f);
+        var y = getY(currentSpectrumData.amplitudes[i]);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.fillStyle = '#ff9800';
+      for (var i = 0; i < currentSpectrumData.peaks.length; i++) {
+        var peak = currentSpectrumData.peaks[i];
+        var x = getX(peak.frequency);
+        var y = getY(peak.amplitude);
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+      var crit = computeCriticalParams();
+      var criticalFreqs = [
+        { f: P.omega, name: 'ω (возбуждение)', color: '#f44336' },
+        { f: crit.omega0, name: 'ω₀ (пружина)', color: '#4caf50' },
+        { f: crit.omega_phi, name: 'ω_φ (маятник)', color: '#ff9800' },
+        { f: crit.omega_anti, name: 'ω_anti', color: '#9c27b0' }
+      ];
+      criticalFreqs.forEach(function(cf) {
+        if (cf.f <= maxFreq) {
+          var x = getX(cf.f);
+          ctx.strokeStyle = cf.color;
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.moveTo(x, padTop);
+          ctx.lineTo(x, H - padBottom);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = cf.color;
+          ctx.font = '9px Arial';
+          ctx.textAlign = 'center';
+          ctx.save();
+          ctx.translate(x, padTop + 10);
+          ctx.rotate(-Math.PI / 4);
+          ctx.fillText(cf.name, 0, 0);
+          ctx.restore();
+        }
+      });
+    }
+    
+    function displayPeaks() {
+      if (!currentSpectrumData || currentSpectrumData.peaks.length === 0) {
+        document.getElementById('peaksList').innerHTML = '<div style="color:#888;">Пики не обнаружены</div>';
+        return;
+      }
+      var html = '';
+      currentSpectrumData.peaks.forEach(function(peak, i) {
+        var ratioToDrive = peak.frequency / P.omega;
+        var ratioText = '';
+        if (Math.abs(ratioToDrive - 1) < 0.05) ratioText = '<span class="peak-ratio">≈ ω</span>';
+        else if (Math.abs(ratioToDrive - 0.5) < 0.05) ratioText = '<span class="peak-ratio">≈ ω/2</span>';
+        else if (Math.abs(ratioToDrive - 2) < 0.05) ratioText = '<span class="peak-ratio">≈ 2ω</span>';
+        else if (Math.abs(ratioToDrive - 0.33) < 0.05) ratioText = '<span class="peak-ratio">≈ ω/3</span>';
+        html += '<div class="peak-item">' +
+          '<span class="peak-frequency">f' + (i+1) + ' = ' + peak.frequency.toFixed(2) + ' рад/с</span>' +
+          ' | <span class="peak-amplitude">A = ' + (peak.ratio * 100).toFixed(1) + '%</span>' +
+          ratioText +
+          '</div>';
+      });
+      document.getElementById('peaksList').innerHTML = html;
+    }
+    
+    document.getElementById('analyzeY').addEventListener('click', function() {
+      currentSpectrumSignal = 'y';
+      document.getElementById('analyzeY').className = 'active';
+      document.getElementById('analyzePhi').className = 'inactive';
+      document.getElementById('analyzePhiDot').className = 'inactive';
+      if (currentSpectrumData) analyzeSpectrum();
+    });
+    document.getElementById('analyzePhi').addEventListener('click', function() {
+      currentSpectrumSignal = 'phi';
+      document.getElementById('analyzePhi').className = 'active';
+      document.getElementById('analyzeY').className = 'inactive';
+      document.getElementById('analyzePhiDot').className = 'inactive';
+      if (currentSpectrumData) analyzeSpectrum();
+    });
+    document.getElementById('analyzePhiDot').addEventListener('click', function() {
+      currentSpectrumSignal = 'phiDot';
+      document.getElementById('analyzePhiDot').className = 'active';
+      document.getElementById('analyzeY').className = 'inactive';
+      document.getElementById('analyzePhi').className = 'inactive';
+      if (currentSpectrumData) analyzeSpectrum();
+    });
+
+    function computeCriticalParams() {
+      var omega0 = Math.sqrt(P.k / P.m);
+      var omega_res_sq = omega0*omega0 - (P.b*P.b)/(2*P.m*P.m);
+      var omega_res = omega_res_sq > 0 ? Math.sqrt(omega_res_sq) : 0;
+      var omega_anti = omega0 / Math.sqrt(2);
+      var omega_phi = Math.sqrt(P.g / P.L);
+      var omega_2phi = 2 * omega_phi;
+      var b_crit = 2 * Math.sqrt(P.k * P.m);
+      var zeta = P.b / b_crit;
+      var k_eff = P.k + (P.F0*P.F0) / (2 * P.m * P.omega * P.omega);
+      var A_max = omega_res > 0 && P.b > 0 ? P.F0 / (P.b * omega_res) : Infinity;
+      return {
+        omega0: omega0, omega_res: omega_res, omega_anti: omega_anti,
+        omega_phi: omega_phi, omega_2phi: omega_2phi,
+        b_crit: b_crit, zeta: zeta, k_eff: k_eff, A_max: A_max
+      };
+    }
+    
+    function determineZone(omega, crit) {
+      var width_mathe = 4;
+      var width_res = Math.max(3, P.b / (2*P.m));
+      if (Math.abs(omega - crit.omega_2phi) < width_mathe) {
+        return { zone: 'danger', name: 'ПАРАМЕТРИЧЕСКИЙ РЕЗОНАНС', color: '#f44336' };
+      }
+      if (crit.omega_res > 0 && Math.abs(omega - crit.omega_res) < width_res) {
+        return { zone: 'danger', name: 'РЕЗОНАНС ПРУЖИНЫ', color: '#f44336' };
+      }
+      if (Math.abs(omega - crit.omega_anti) < 2) {
+        return { zone: 'warning', name: 'АНТИ-РЕЗОНАНС', color: '#ff9800' };
+      }
+      if (Math.abs(omega - crit.omega_2phi) < width_mathe * 2 || 
+          (crit.omega_res > 0 && Math.abs(omega - crit.omega_res) < width_res * 2)) {
+        return { zone: 'warning', name: 'ПРИБЛИЖЕНИЕ К РЕЗОНАНСУ', color: '#ff9800' };
+      }
+      return { zone: 'safe', name: 'БЕЗОПАСНАЯ ЗОНА', color: '#4caf50' };
+    }
+    
+    function updateCriticalDisplay() {
+      var crit = computeCriticalParams();
+      var zoneInfo = determineZone(P.omega, crit);
+      document.getElementById('crit_omega0').textContent = crit.omega0.toFixed(2) + ' рад/с';
+      document.getElementById('crit_omega_res').textContent = crit.omega_res > 0 ? crit.omega_res.toFixed(2) + ' рад/с' : '—';
+      document.getElementById('crit_omega_anti').textContent = crit.omega_anti.toFixed(2) + ' рад/с';
+      document.getElementById('crit_omega_phi').textContent = crit.omega_phi.toFixed(2) + ' рад/с';
+      document.getElementById('crit_2omega_phi').textContent = crit.omega_2phi.toFixed(2) + ' рад/с';
+      document.getElementById('crit_b_crit').textContent = crit.b_crit.toFixed(2) + ' Н·с/м';
+      document.getElementById('crit_zeta').textContent = crit.zeta.toFixed(3);
+      document.getElementById('crit_current_omega').textContent = P.omega.toFixed(1) + ' рад/с';
+      document.getElementById('crit_ratio').textContent = (P.omega / crit.omega0).toFixed(3);
+      document.getElementById('crit_k_eff').textContent = crit.k_eff.toFixed(1) + ' Н/м';
+      document.getElementById('crit_A_max').textContent = isFinite(crit.A_max) ? crit.A_max.toFixed(3) + ' м' : '∞';
+      var zoneEl = document.getElementById('zoneIndicator');
+      zoneEl.className = 'zone-indicator zone-' + zoneInfo.zone;
+      zoneEl.textContent = 'ЗОНА: ' + zoneInfo.name;
+      var markerPos = ((P.omega - 5) / (100 - 5)) * 100;
+      markerPos = Math.max(0, Math.min(100, markerPos));
+      document.getElementById('markerOmega').style.left = markerPos + '%';
+    }
+
+    function derivatives(state, t) {
+      var phi = state[0], phiDot = state[1], y = state[2], yDot = state[3];
+      
+      var F_vert = P.F0 * Math.cos(P.omega * t);
+      var sinPhi = Math.sin(phi);
+      var cosPhi = Math.cos(phi);
+      
+      var a11 = P.L;
+      var a12 = sinPhi;
+      var b1 = -P.g * sinPhi;
+      
+      var a21 = P.m * P.L * sinPhi;
+      var a22 = P.m;
+      var b2 = F_vert - P.m * P.g - P.k * y - P.b * yDot - P.m * P.L * cosPhi * phiDot * phiDot;
+      
+      var det = a11 * a22 - a12 * a21;
+      var phiDDot, yDDot;
+      
+      if (Math.abs(det) < 1e-6) {
+        phiDDot = -P.g * sinPhi / P.L;
+        yDDot = (F_vert - P.m * P.g - P.k * y - P.b * yDot) / P.m;
+      } else {
+        phiDDot = (b1 * a22 - b2 * a12) / det;
+        yDDot = (a11 * b2 - a21 * b1) / det;
+      }
+      
+      var maxAccel = 1000;
+      if (Math.abs(phiDDot) > maxAccel) phiDDot = Math.sign(phiDDot) * maxAccel;
+      if (Math.abs(yDDot) > maxAccel) yDDot = Math.sign(yDDot) * maxAccel;
+      
+      return [phiDot, phiDDot, yDot, yDDot];
+    }
+    
+    function rk4Step(state, t, h) {
+      var k1 = derivatives(state, t);
+      var s2 = [state[0]+0.5*h*k1[0], state[1]+0.5*h*k1[1], state[2]+0.5*h*k1[2], state[3]+0.5*h*k1[3]];
+      var k2 = derivatives(s2, t+0.5*h);
+      var s3 = [state[0]+0.5*h*k2[0], state[1]+0.5*h*k2[1], state[2]+0.5*h*k2[2], state[3]+0.5*h*k2[3]];
+      var k3 = derivatives(s3, t+0.5*h);
+      var s4 = [state[0]+h*k3[0], state[1]+h*k3[1], state[2]+h*k3[2], state[3]+h*k3[3]];
+      var k4 = derivatives(s4, t+h);
+      return [
+        state[0] + (h/6)*(k1[0]+2*k2[0]+2*k3[0]+k4[0]),
+        state[1] + (h/6)*(k1[1]+2*k2[1]+2*k3[1]+k4[1]),
+        state[2] + (h/6)*(k1[2]+2*k2[2]+2*k3[2]+k4[2]),
+        state[3] + (h/6)*(k1[3]+2*k2[3]+2*k3[3]+k4[3])
+      ];
+    }
+    
+    function applyLimits() {
+      if (!P.enableLimits) return;
+      var maxVel = 50;
+      if (y < P.yMin) { 
+        y = P.yMin; 
+        var newVel = Math.abs(yDot) * 0.3;
+        yDot = Math.min(newVel, maxVel);
+        limitHitTime = time;
+        limitHitSide = -1;
+      }
+      if (y > P.yMax) { 
+        y = P.yMax; 
+        var newVel = Math.abs(yDot) * 0.3;
+        yDot = -Math.min(newVel, maxVel);
+        limitHitTime = time;
+        limitHitSide = 1;
+      }
+      if (Math.abs(yDot) > maxVel) {
+        yDot = Math.sign(yDot) * maxVel;
+      }
+    }
+    
+    function physics(dt) {
+      if (paused || !started) return;
+      var scaledDt = dt * P.speed;
+      var N = Math.max(100, Math.ceil(P.omega * scaledDt * 10));
+      var h = scaledDt / N;
+      for (var i = 0; i < N; i++) {
+        var ns = rk4Step([phi, phiDot, y, yDot], time, h);
+        phi = ns[0]; phiDot = ns[1]; y = ns[2]; yDot = ns[3];
+        applyLimits();
+        if (!isFinite(phi) || !isFinite(phiDot) || !isFinite(y) || !isFinite(yDot)) {
+          console.error('Численная неустойчивость! Сброс.');
+          phi = phi0; phiDot = 0; y = y0; yDot = 0;
+          break;
+        }
+        time += h;
+        if (isRecordingEffect) {
+          if (effectTrajectory.length === 0 || time - effectTrajectory[effectTrajectory.length-1].t >= 0.02) {
+            effectTrajectory.push({ t: time, y: y, phi: phi, phiDot: phiDot });
+            if (effectTrajectory.length % 10 === 0) updateStatus(paused);
+          }
+        }
+      }
+      yHistory.push({t: time, y: y, phi: phi, phiDot: phiDot});
+      if (yHistory.length > 300) yHistory.shift();
+    }
+
+    function drawSpring(x1, y1, x2, y2, color, coils, amplitude) {
+      var dx = x2 - x1, dy = y2 - y1;
+      var len = Math.sqrt(dx*dx + dy*dy);
+      if (len < 5) return;
+      simCtx.strokeStyle = color;
+      simCtx.lineWidth = 2;
+      simCtx.beginPath();
+      simCtx.moveTo(x1, y1);
+      var segments = coils * 2;
+      for (var i = 1; i < segments; i++) {
+        var t = i / segments;
+        var px = x1 + dx * t;
+        var py = y1 + dy * t;
+        var offset = (i % 2 === 0) ? amplitude : -amplitude;
+        simCtx.lineTo(px + offset, py);
+      }
+      simCtx.lineTo(x2, y2);
+      simCtx.stroke();
+    }
+
+    function drawPhiDotGraph() {
+      var W = phiDotCanvas.width, H = phiDotCanvas.height;
+      phiDotCtx.clearRect(0, 0, W, H);
+      phiDotCtx.fillStyle = '#ccc';
+      phiDotCtx.font = 'bold 11px Arial';
+      phiDotCtx.textAlign = 'center';
+      phiDotCtx.fillText('Угловая скорость φ̇(t)', W / 2, 15);
+      if (yHistory.length < 2) return;
+      var tMin = yHistory[0].t;
+      var tMax = yHistory[yHistory.length - 1].t;
+      var tRange = Math.max(tMax - tMin, 0.1);
+      var pdMin = Infinity, pdMax = -Infinity;
+      for (var i = 0; i < yHistory.length; i++) {
+        var pd = yHistory[i].phiDot || 0;
+        if (pd < pdMin) pdMin = pd;
+        if (pd > pdMax) pdMax = pd;
+      }
+      var pdAbsMax = Math.max(Math.abs(pdMin), Math.abs(pdMax), 1);
+      pdMin = -pdAbsMax;
+      pdMax = pdAbsMax;
+      var pdRange = pdMax - pdMin;
+      var padLeft = 50, padRight = 20, padTop = 30, padBottom = 40;
+      var gW = W - padLeft - padRight;
+      var gH = H - padTop - padBottom;
+      function getX(t) { return padLeft + ((t - tMin) / tRange) * gW; }
+      function getY(pd) { return padTop + gH - ((pd - pdMin) / pdRange) * gH; }
+      phiDotCtx.strokeStyle = '#888';
+      phiDotCtx.lineWidth = 1.5;
+      phiDotCtx.beginPath();
+      phiDotCtx.moveTo(padLeft, padTop);
+      phiDotCtx.lineTo(padLeft, H - padBottom);
+      phiDotCtx.lineTo(W - padRight, H - padBottom);
+      phiDotCtx.stroke();
+      var yZero = getY(0);
+      phiDotCtx.strokeStyle = '#555';
+      phiDotCtx.lineWidth = 1;
+      phiDotCtx.setLineDash([4, 4]);
+      phiDotCtx.beginPath();
+      phiDotCtx.moveTo(padLeft, yZero);
+      phiDotCtx.lineTo(W - padRight, yZero);
+      phiDotCtx.stroke();
+      phiDotCtx.setLineDash([]);
+      phiDotCtx.fillStyle = '#ccc';
+      phiDotCtx.font = 'bold 12px Arial';
+      phiDotCtx.textAlign = 'center';
+      phiDotCtx.fillText('t (с)', padLeft + gW / 2, H - 10);
+      phiDotCtx.save();
+      phiDotCtx.translate(15, padTop + gH / 2);
+      phiDotCtx.rotate(-Math.PI / 2);
+      phiDotCtx.fillText('φ̇ (рад/с)', 0, 0);
+      phiDotCtx.restore();
+      phiDotCtx.strokeStyle = '#333';
+      phiDotCtx.lineWidth = 1;
+      phiDotCtx.fillStyle = '#888';
+      phiDotCtx.font = '10px monospace';
+      phiDotCtx.textAlign = 'center';
+      var tStep = Math.pow(10, Math.floor(Math.log10(tRange / 5)));
+      for (var t = Math.ceil(tMin / tStep) * tStep; t <= tMax; t += tStep) {
+        var x = getX(t);
+        phiDotCtx.beginPath();
+        phiDotCtx.moveTo(x, padTop);
+        phiDotCtx.lineTo(x, H - padBottom);
+        phiDotCtx.stroke();
+        phiDotCtx.fillText(t.toFixed(1), x, H - padBottom + 15);
+      }
+      phiDotCtx.textAlign = 'right';
+      phiDotCtx.fillText(pdMax.toFixed(1), padLeft - 5, padTop + 10);
+      phiDotCtx.fillText('0', padLeft - 5, yZero + 3);
+      phiDotCtx.fillText(pdMin.toFixed(1), padLeft - 5, H - padBottom);
+      phiDotCtx.strokeStyle = '#9c27b0';
+      phiDotCtx.lineWidth = 2;
+      phiDotCtx.beginPath();
+      for (var i = 0; i < yHistory.length; i++) {
+        var x = getX(yHistory[i].t);
+        var yPos = getY(yHistory[i].phiDot || 0);
+        if (i === 0) phiDotCtx.moveTo(x, yPos);
+        else phiDotCtx.lineTo(x, yPos);
+      }
+      phiDotCtx.stroke();
+      var currentPhiDot = yHistory[yHistory.length - 1].phiDot || 0;
+      phiDotCtx.fillStyle = '#9c27b0';
+      phiDotCtx.font = 'bold 11px Arial';
+      phiDotCtx.textAlign = 'right';
+      phiDotCtx.fillText('φ̇ = ' + currentPhiDot.toFixed(2) + ' рад/с', W - padRight, padTop + 10);
+    }
+
+    function draw() {
+      var W = simCanvas.width, H = simCanvas.height;
+      simCtx.clearRect(0, 0, W, H);
+      var cx = W * 0.5, cy = H * 0.25, scale = Math.min(W, H) * 0.25;
+      simCtx.fillStyle = '#888';
+      simCtx.beginPath();
+      simCtx.arc(cx, cy, 6, 0, Math.PI*2);
+      simCtx.fill();
+      var rodEndX = cx + P.L * scale * Math.sin(phi);
+      var rodEndY = cy + P.L * scale * Math.cos(phi);
+      simCtx.strokeStyle = '#2196f3';
+      simCtx.lineWidth = 3;
+      simCtx.beginPath();
+      simCtx.moveTo(cx, cy);
+      simCtx.lineTo(rodEndX, rodEndY);
+      simCtx.stroke();
+      simCtx.fillStyle = '#666';
+      simCtx.beginPath();
+      simCtx.arc(rodEndX, rodEndY, 4, 0, Math.PI*2);
+      simCtx.fill();
+      var springLength = 50 + y * scale * 2;
+      var massX = rodEndX;
+      var massY = rodEndY + springLength;
+      if (P.enableLimits) {
+        var yMinScreen = rodEndY + 50 + P.yMin * scale * 2;
+        var yMaxScreen = rodEndY + 50 + P.yMax * scale * 2;
+        simCtx.strokeStyle = '#f44336';
+        simCtx.lineWidth = 2;
+        simCtx.setLineDash([4, 4]);
+        simCtx.beginPath();
+        simCtx.moveTo(rodEndX - 30, yMinScreen);
+        simCtx.lineTo(rodEndX + 30, yMinScreen);
+        simCtx.stroke();
+        simCtx.beginPath();
+        simCtx.moveTo(rodEndX - 30, yMaxScreen);
+        simCtx.lineTo(rodEndX + 30, yMaxScreen);
+        simCtx.stroke();
+        simCtx.setLineDash([]);
+        simCtx.fillStyle = '#f44336';
+        simCtx.font = '9px Arial';
+        simCtx.textAlign = 'left';
+        simCtx.fillText('y_min=' + P.yMin.toFixed(2), rodEndX + 35, yMinScreen + 3);
+        simCtx.fillText('y_max=' + P.yMax.toFixed(2), rodEndX + 35, yMaxScreen + 3);
+        var hitIndicator = document.getElementById('limitHitIndicator');
+        if (time - limitHitTime < 0.5 && limitHitSide !== 0) {
+          hitIndicator.classList.add('show');
+          hitIndicator.textContent = limitHitSide === -1 ? 
+            '⚠ Упор в y_min' : '⚠ Упор в y_max';
+        } else {
+          hitIndicator.classList.remove('show');
+        }
+      } else {
+        document.getElementById('limitHitIndicator').classList.remove('show');
+      }
+      drawSpring(rodEndX, rodEndY, massX, massY, '#888', 8, 6);
+      simCtx.fillStyle = '#ff9800';
+      simCtx.fillRect(massX - 15, massY - 15, 30, 30);
+      simCtx.strokeStyle = '#fff';
+      simCtx.lineWidth = 1;
+      simCtx.strokeRect(massX - 15, massY - 15, 30, 30);
+      var F_vert = P.F0 * Math.cos(P.omega * time);
+      var arrowLen = F_vert * 0.8;
+      if (Math.abs(arrowLen) > 3) {
+        simCtx.strokeStyle = '#f0883e';
+        simCtx.lineWidth = 3;
+        simCtx.beginPath();
+        simCtx.moveTo(massX, massY);
+        simCtx.lineTo(massX, massY - arrowLen);
+        simCtx.stroke();
+        simCtx.fillStyle = '#f0883e';
+        simCtx.beginPath();
+        simCtx.moveTo(massX, massY - arrowLen);
+        simCtx.lineTo(massX - 6, massY - arrowLen + 8);
+        simCtx.lineTo(massX + 6, massY - arrowLen + 8);
+        simCtx.closePath();
+        simCtx.fill();
+        simCtx.fillStyle = '#f0883e';
+        simCtx.font = 'bold 11px Arial';
+        simCtx.fillText('F(t)', massX + 20, massY - arrowLen / 2);
+      }
+      simCtx.strokeStyle = 'rgba(255,255,255,0.2)';
+      simCtx.lineWidth = 1;
+      simCtx.setLineDash([5, 5]);
+      simCtx.beginPath();
+      simCtx.moveTo(rodEndX, rodEndY);
+      simCtx.lineTo(rodEndX, H - 20);
+      simCtx.stroke();
+      simCtx.setLineDash([]);
+      simCtx.fillStyle = '#888';
+      simCtx.font = 'italic 12px Arial';
+      simCtx.fillText('g ↓', cx + 5, cy - 15);
+      simCtx.fillStyle = '#fff';
+      simCtx.font = '11px Arial';
+      simCtx.textAlign = 'left';
+      simCtx.fillText('φ = ' + phi.toFixed(3) + ' рад', 10, 20);
+      simCtx.fillText('y = ' + y.toFixed(4) + ' м', 10, 35);
+      simCtx.fillText('φ̇ = ' + phiDot.toFixed(2) + ' рад/с', 10, 50);
+      simCtx.fillText('t = ' + time.toFixed(1) + ' с', 10, 65);
+      simCtx.fillStyle = P.enableLimits ? '#4caf50' : '#888';
+      simCtx.font = 'bold 10px Arial';
+      simCtx.fillText(P.enableLimits ? 'ОГРАНИЧИТЕЛИ: ВКЛ' : 'ОГРАНИЧИТЕЛИ: ВЫКЛ', 10, 80);
+      if (isRecordingEffect) {
+        simCtx.fillStyle = '#e91e63';
+        simCtx.font = 'bold 11px Arial';
+        simCtx.textAlign = 'right';
+        simCtx.fillText('🔴 ЗАПИСЬ: ' + effectTrajectory.length + ' точек', W - 10, 40);
+        simCtx.textAlign = 'left';
+      }
+      var crit = computeCriticalParams();
+      var zoneInfo = determineZone(P.omega, crit);
+      simCtx.fillStyle = zoneInfo.color;
+      simCtx.font = 'bold 11px Arial';
+      simCtx.textAlign = 'right';
+      simCtx.fillText(zoneInfo.name, W - 10, 20);
+      simCtx.textAlign = 'left';
+      var W2 = graphCanvas.width, H2 = graphCanvas.height;
+      graphCtx.clearRect(0, 0, W2, H2);
+      graphCtx.fillStyle = '#ccc';
+      graphCtx.font = 'bold 11px Arial';
+      graphCtx.textAlign = 'center';
+      graphCtx.fillText('Вертикальное смещение y(t)', W2 / 2, 15);
+      if (yHistory.length > 2) {
+        var tMin = yHistory[0].t;
+        var tMax = yHistory[yHistory.length - 1].t;
+        var tRange = Math.max(tMax - tMin, 0.1);
+        var yMin = Infinity, yMax = -Infinity;
+        for (var i = 0; i < yHistory.length; i++) {
+          if (yHistory[i].y < yMin) yMin = yHistory[i].y;
+          if (yHistory[i].y > yMax) yMax = yHistory[i].y;
+        }
+        if (P.enableLimits) {
+          if (P.yMin < yMin) yMin = P.yMin;
+          if (P.yMax > yMax) yMax = P.yMax;
+        }
+        var yRange = Math.max(yMax - yMin, 0.01);
+        var padLeft = 50, padRight = 20, padTop = 30, padBottom = 40;
+        var gW = W2 - padLeft - padRight;
+        var gH = H2 - padTop - padBottom;
+        graphCtx.strokeStyle = '#888';
+        graphCtx.lineWidth = 1.5;
+        graphCtx.beginPath();
+        graphCtx.moveTo(padLeft, padTop);
+        graphCtx.lineTo(padLeft, H2 - padBottom);
+        graphCtx.lineTo(W2 - padRight, H2 - padBottom);
+        graphCtx.stroke();
+        if (P.enableLimits) {
+          var yMinLine = padTop + gH - ((P.yMin - yMin) / yRange) * gH;
+          var yMaxLine = padTop + gH - ((P.yMax - yMin) / yRange) * gH;
+          graphCtx.strokeStyle = '#f44336';
+          graphCtx.lineWidth = 1.5;
+          graphCtx.setLineDash([5, 5]);
+          graphCtx.beginPath();
+          graphCtx.moveTo(padLeft, yMinLine);
+          graphCtx.lineTo(W2 - padRight, yMinLine);
+          graphCtx.stroke();
+          graphCtx.beginPath();
+          graphCtx.moveTo(padLeft, yMaxLine);
+          graphCtx.lineTo(W2 - padRight, yMaxLine);
+          graphCtx.stroke();
+          graphCtx.setLineDash([]);
+          graphCtx.fillStyle = '#f44336';
+          graphCtx.font = '9px Arial';
+          graphCtx.textAlign = 'left';
+          graphCtx.fillText('y_min', W2 - padRight - 35, yMinLine - 3);
+          graphCtx.fillText('y_max', W2 - padRight - 35, yMaxLine - 3);
+        }
+        graphCtx.fillStyle = '#ccc';
+        graphCtx.font = 'bold 12px Arial';
+        graphCtx.textAlign = 'center';
+        graphCtx.fillText('t (с)', padLeft + gW / 2, H2 - 10);
+        graphCtx.save();
+        graphCtx.translate(15, padTop + gH / 2);
+        graphCtx.rotate(-Math.PI / 2);
+        graphCtx.fillText('y (м)', 0, 0);
+        graphCtx.restore();
+        graphCtx.strokeStyle = zoneInfo.color;
+        graphCtx.lineWidth = 2;
+        graphCtx.beginPath();
+        for (var i = 0; i < yHistory.length; i++) {
+          var x = padLeft + ((yHistory[i].t - tMin) / tRange) * gW;
+          var yPos = padTop + gH - ((yHistory[i].y - yMin) / yRange) * gH;
+          if (i === 0) graphCtx.moveTo(x, yPos);
+          else graphCtx.lineTo(x, yPos);
+        }
+        graphCtx.stroke();
+        graphCtx.fillStyle = '#888';
+        graphCtx.font = '10px monospace';
+        graphCtx.textAlign = 'center';
+        graphCtx.fillText(tMin.toFixed(1), padLeft, H2 - padBottom + 15);
+        graphCtx.fillText(tMax.toFixed(1), W2 - padRight, H2 - padBottom + 15);
+        graphCtx.textAlign = 'right';
+        graphCtx.fillText(yMin.toFixed(3), padLeft - 5, H2 - padBottom);
+        graphCtx.fillText(yMax.toFixed(3), padLeft - 5, padTop + 10);
+      }
+    }
+
+    function loop() {
+      physics(0.016);
+      draw();
+      drawPhiDotGraph();
+      requestAnimationFrame(loop);
+    }
+
+    resizeCanvases();
+    draw();
+    updateCriticalDisplay();
+    updateStatus(true);
+    loop();
+    
+    console.log('Модель удочки загружена!');
+  } catch (e) {
+    console.error('Ошибка:', e);
+    alert('Ошибка: ' + e.message);
+  }
+};
+</script>
+</body>
+</html>
