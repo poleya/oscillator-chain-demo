@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Модели колебательных систем — Елисеев А.В.</title>
+<style>
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+  max-width: 900px; 
+  margin: 40px auto; 
+  padding: 20px; 
+  background: #f5f5f5; 
+  color: #333;
+}
+h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+h2 { color: #34495e; margin-top: 30px; }
+.demo-list { 
+  list-style: none; 
+  padding: 0; 
+}
+.demo-item { 
+  background: white; 
+  margin: 15px 0; 
+  padding: 20px; 
+  border-radius: 8px; 
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  border-left: 4px solid #3498db;
+}
+.demo-item:hover {
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
+  transition: all 0.2s;
+}
+.demo-title { 
+  font-size: 18px; 
+  font-weight: bold; 
+  color: #2c3e50; 
+  margin-bottom: 8px;
+}
+.demo-desc { 
+  color: #666; 
+  font-size: 14px; 
+  margin-bottom: 10px;
+}
+.demo-link { 
+  display: inline-block;
+  background: #3498db; 
+  color: white; 
+  padding: 8px 16px; 
+  text-decoration: none; 
+  border-radius: 5px;
+  font-size: 14px;
+}
+.demo-link:hover { background: #2980b9; }
+.info { 
+  background: #fff3cd; 
+  padding: 15px; 
+  border-left: 4px solid #ffc107; 
+  margin: 20px 0; 
+  border-radius: 4px; 
+}
+footer { 
+  margin-top: 50px; 
+  padding-top: 20px; 
+  border-top: 1px solid #ddd; 
+  color: #888; 
+  font-size: 12px;
+  text-align: center;
+}
+</style>
+</head>
+<body>
+
+<h1>🔬 Интерактивные модели колебательных систем</h1>
+
+<p>Коллекция вычислительных программ для исследования нелинейной динамики механических систем. Все программы работают прямо в браузере, не требуют установки и полностью автономны.</p>
+
+<div class="info">
+<b>📌 Как использовать:</b> Нажмите на кнопку "Запустить" рядом с нужной моделью. Программа откроется в новой вкладке. Для работы требуется современный веб-браузер (Chrome, Firefox, Safari, Edge).
+</div>
+
+<h2>📚 Доступные модели</h2>
+
+<ul class="demo-list">
+
+<li class="demo-item">
+  <div class="demo-title">1. Модель удочки (v1.0)</div>
+  <div class="demo-desc">Модификация маятника Капицы с вертикальными колебаниями массы на упругом подвесе. Исследование параметрического резонанса и субгармонических режимов.</div>
+  <a href="demos/model-udochka-v1.0.html" class="demo-link">🚀 Запустить</a>
+</li>
+
+<li class="demo-item">
+  <div class="demo-title">2. Классический маятник Капицы (v1.0)</div>
+  <div class="demo-desc">Динамическая стабилизация перевёрнутого маятника высокочастотной вибрацией подвеса. Эффект Капицы в чистом виде.</div>
+  <a href="demos/kapitza-pendulum-v1.0.html" class="demo-link">🚀 Запустить</a>
+</li>
+
+<li class="demo-item">
+  <div class="demo-title">3. Параметрический резонанс (v1.0)</div>
+  <div class="demo-desc">Демонстрация экспоненциального роста амплитуды при совпадении частоты возбуждения с собственной частотой системы.</div>
+  <a href="demos/parametric-resonance-v1.0.html" class="demo-link">🚀 Запустить</a>
+</li>
+
+<li class="demo-item">
+  <div class="demo-title">4. Субгармонические колебания (v1.0)</div>
+  <div class="demo-desc">Исследование режимов с частотами ω/2, ω/3 и других субгармоник в нелинейных системах.</div>
+  <a href="demos/subharmonic-oscillations-v1.0.html" class="demo-link">🚀 Запустить</a>
+</li>
+
+<!-- Добавьте сюда остальные 6 программ по тому же шаблону -->
+
+</ul>
+
+<h2>📖 Документация</h2>
+<p>Полное описание каждой модели, физическая постановка задачи и результаты численных экспериментов доступны в <a href="README.md">README.md</a>.</p>
+
+<h2>👨‍🔬 Автор</h2>
+<p><strong>Елисеев Андрей Владимирович</strong><br>
+Соискатель, направление: методы структурного математического моделирования механических колебательных систем.<br>
+📧 <a href="mailto:eavsh@ya.ru">eavsh@ya.ru</a></p>
+
+<footer>
+© Елисеев А. В., 2026 | 
+<a href="https://github.com/poleya/oscillator-chain-demo">GitHub</a> | 
+Лицензия MIT
+</footer>
+
+</body>
+</html>
